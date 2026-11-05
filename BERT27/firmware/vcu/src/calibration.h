@@ -19,8 +19,8 @@
 // ramping linearly to 100% by 40 C (system max is 50 C).
 static const float FAN_TEMP_MIN_C = 25.0f;
 static const float FAN_TEMP_MAX_C = 40.0f;
-static const int FAN_DUTY_MIN_PERCENT = 20;
-static const int FAN_DUTY_MAX_PERCENT = 100;
+static const int FAN_DUTY_MIN_PCT = 20;
+static const int FAN_DUTY_MAX_PCT = 100;
 
 // ---------------- Accelerator pedal ----------------
 // Raw ADC calibration ranges from the BERT26 pedal test sketch.
@@ -33,7 +33,7 @@ static const float PEDAL_ZERO_DEADBAND_PCT = 7.0f;
 
 // ---- Regenerative braking -----------------------------------------------
 // This single switch makes regen easy to disable without changing any logic.
-static constexpr bool REGEN_ENABLED = true;
+static constexpr bool IS_REGEN_ENABLED = true;
 static const float REGEN_MAX_TORQUE_NM = 50.0f;
 // Regen reaches its maximum at the end of the light-braking region, then
 // tapers back to zero through the heavy-braking region to reduce lockup risk.
@@ -51,8 +51,8 @@ static const float REGEN_PACK_CURRENT_SENSOR_MAX_A = 500.0f;
 // ---------------- Brake pressure sensors ----------------
 // Calculated from voltage divider at input. R1 = 5.6k, R2 = 15k, Gain = 0.728
 // This comment was written by a human, me
-static const float BSE_SENSOR_MIN_VOLTAGE  = 0.364f;
-static const float BSE_SENSOR_MAX_VOLTAGE  = 3.277f;
+static const float BSE_SENSOR_MIN_V  = 0.364f;
+static const float BSE_SENSOR_MAX_V  = 3.277f;
 static const int BSE_1_BRAKING_RAW_THRESHOLD = 600;
 static const int BSE_2_BRAKING_RAW_THRESHOLD = 800;
 static const int BSE_1_HARD_BRAKING_RAW_THRESHOLD = 2000;

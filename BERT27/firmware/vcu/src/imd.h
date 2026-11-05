@@ -16,15 +16,15 @@
 static constexpr uint32_t IMD_REQUEST_ID      = 0x22;
 static constexpr uint8_t IDX_WARN_ALARMS      = 0x6C;
 
-// IMD state decoded from 0x37 and 0x23. imdFault drives the TSSI and RTD.
-extern bool imdFault;
+// IMD state decoded from 0x37 and 0x23. hasImdFault drives the TSSI and RTD.
+extern bool hasImdFault;
 extern uint16_t imdWarnAlarms;
 extern uint16_t imdRIsoKohm;
 extern uint8_t imdRIsoStatus;
 extern uint32_t lastImdRxMs;
-extern bool imdCanTimedOut;
+extern bool isImdCanTimedOut;
 
-void handleImdFrame(const CAN_message_t &msg);
-void requestImdWarnings();
+void imdHandleFrame(const CAN_message_t &frame);
+void imdRequestWarnings();
 
 #endif  // VCU_IMD_H

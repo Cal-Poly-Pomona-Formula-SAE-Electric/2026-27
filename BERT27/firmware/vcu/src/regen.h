@@ -13,7 +13,7 @@
 
 extern float regenTorqueNm;
 
-bool pushRegenVoltageSample(uint32_t nowMs);
-float calculateRegenTorqueNm();
+bool regenPushVoltageSample(uint32_t nowMs);
+float regenCalculateTorqueNm();
 
 #endif  // VCU_REGEN_H

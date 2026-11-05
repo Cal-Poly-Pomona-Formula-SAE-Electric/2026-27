@@ -27,11 +27,11 @@ static constexpr uint32_t BMS_CELL_RESPONSE_2026_ID = 0x313;
 static constexpr uint32_t IMD_INFO_GENERAL_ID = 0x37;
 static constexpr uint32_t IMD_RESPONSE_ID     = 0x23;
 
-extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> VehicleCan;
+extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> vehicleCan;
 
-void setupVehicleCan();
-void sendCanFrame(CAN_message_t &msg);
-void receiveCanFrames();
-void logCanFrame(const char *direction, const CAN_message_t &msg);
+void canSetup();
+void canSendFrame(CAN_message_t &frame);
+void canReceiveFrames();
+void canLogFrame(const char *direction, const CAN_message_t &frame);
 
 #endif  // VCU_VEHICLE_CAN_H

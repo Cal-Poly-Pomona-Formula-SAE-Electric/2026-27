@@ -16,8 +16,8 @@
 #include "fault_text.h"
 #include "dashboard.h"
 
-void sendPm100BroadcastEnable();
-void sendPm100FaultClear();
+void inverterSendBroadcastEnable();
+void inverterSendFaultClear();
 
 static constexpr uint32_t PM100_PARAM_COMMAND_ID  = 0x0C1;
 
@@ -35,43 +35,43 @@ static constexpr uint8_t PM100_BROADCAST_ENABLE_MAX_ATTEMPTS = 3;
 // minimum, so any bus above that means the pack is genuinely back on the bus.
 static constexpr uint16_t PM100_PARAM_FAULT_CLEAR = 20;
 
-float inverterDcBusVoltage = 0.0f;
-float inverterDcBusCurrent = 0.0f;
-bool haveInverterVoltageInfo = false;
-bool haveInverterCurrentInfo = false;
+float inverterDcBusVoltageV = 0.0f;
+float inverterDcBusCurrentA = 0.0f;
+bool hasInverterVoltageInfo = false;
+bool hasInverterCurrentInfo = false;
 // GLV (12V system) voltage reported by the PM100 Internal Voltages frame.
-float glvVoltage = 0.0f;
-bool haveGlvVoltage = false;
+float glvVoltageV = 0.0f;
+bool hasGlvVoltage = false;
 // If the inverter is talking but 0x0A9 never arrives, its broadcast mask has
 // Internal Voltages disabled; we write parameter 148 once to turn it back on.
-bool havePm100Traffic = false;
+bool hasPm100Traffic = false;
 uint32_t firstPm100FrameMs = 0;
 uint8_t pm100BroadcastEnableAttempts = 0;
 uint32_t pm100BroadcastEnableLastTxMs = 0;
 float powerKw = 0.0f;
 int16_t inverterTempTenthsC = 0;
 int16_t pm100MotorTempTenthsC = 0;
-bool haveInverterTemp = false;
-bool havePm100MotorTemp = false;
+bool hasInverterTemp = false;
+bool hasPm100MotorTemp = false;
 uint32_t pm100PostFaults = 0;
 uint32_t pm100RunFaults = 0;
-bool havePm100FaultStatus = false;
-bool pm100Fault = false;
+bool hasPm100FaultStatus = false;
+bool hasPm100Fault = false;
 // Automatic fault-clear bookkeeping; attempts reset when the fault clears or
 // the contactors open, so each HV cycle gets a fresh set of retries.
 uint8_t pm100FaultClearAttempts = 0;
 uint32_t pm100FaultClearLastTxMs = 0;
 int16_t motorRpm = 0;
 
-void handlePm100Temperatures1Frame(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void inverterHandleTemperatures1Frame(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     return;
   }
 
-  int16_t moduleATempRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t moduleBTempRaw = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t moduleCTempRaw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t gateDriverTempRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t moduleATempRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t moduleBTempRaw = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t moduleCTempRaw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t gateDriverTempRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   int16_t hottestTempRaw = moduleATempRaw;
   if (moduleBTempRaw > hottestTempRaw) hottestTempRaw = moduleBTempRaw;
@@ -79,72 +79,72 @@ void handlePm100Temperatures1Frame(const CAN_message_t &msg) {
   if (gateDriverTempRaw > hottestTempRaw) hottestTempRaw = gateDriverTempRaw;
 
   inverterTempTenthsC = hottestTempRaw;
-  haveInverterTemp = true;
-  screenDirty = true;
+  hasInverterTemp = true;
+  isScreenDirty = true;
 }
 
-void handlePm100Temperatures3Frame(const CAN_message_t &msg) {
-  if (msg.len < 6) {
+void inverterHandleTemperatures3Frame(const CAN_message_t &frame) {
+  if (frame.len < 6) {
     return;
   }
 
-  pm100MotorTempTenthsC = s16Le(msg.buf[4], msg.buf[5]);
-  havePm100MotorTemp = true;
-  screenDirty = true;
+  pm100MotorTempTenthsC = canReadS16Le(frame.buf[4], frame.buf[5]);
+  hasPm100MotorTemp = true;
+  isScreenDirty = true;
 }
 
-void handlePm100RpmFrame(const CAN_message_t &msg) {
-  if (msg.len < 4) {
+void inverterHandleRpmFrame(const CAN_message_t &frame) {
+  if (frame.len < 4) {
     return;
   }
 
-  motorRpm = s16Le(msg.buf[2], msg.buf[3]);
-  screenDirty = true;
+  motorRpm = canReadS16Le(frame.buf[2], frame.buf[3]);
+  isScreenDirty = true;
 }
 
-void handlePm100CurrentInfoFrame(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void inverterHandleCurrentInfoFrame(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     return;
   }
 
-  inverterDcBusCurrent = (float)s16Le(msg.buf[6], msg.buf[7]) / 10.0f;
-  haveInverterCurrentInfo = true;
-  screenDirty = true;
+  inverterDcBusCurrentA = (float)canReadS16Le(frame.buf[6], frame.buf[7]) / 10.0f;
+  hasInverterCurrentInfo = true;
+  isScreenDirty = true;
 }
 
-void handlePm100VoltageInfoFrame(const CAN_message_t &msg) {
-  if (msg.len < 2) {
+void inverterHandleVoltageInfoFrame(const CAN_message_t &frame) {
+  if (frame.len < 2) {
     return;
   }
 
-  inverterDcBusVoltage = (float)s16Le(msg.buf[0], msg.buf[1]) / 10.0f;
-  haveInverterVoltageInfo = true;
-  screenDirty = true;
+  inverterDcBusVoltageV = (float)canReadS16Le(frame.buf[0], frame.buf[1]) / 10.0f;
+  hasInverterVoltageInfo = true;
+  isScreenDirty = true;
 }
 
-void handlePm100InternalVoltagesFrame(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void inverterHandleInternalVoltagesFrame(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     return;
   }
 
   // Bytes 6-7 = 12V System voltage, "Low Voltage" format (volts * 100).
-  glvVoltage = (float)s16Le(msg.buf[6], msg.buf[7]) / 100.0f;
-  haveGlvVoltage = true;
-  screenDirty = true;
+  glvVoltageV = (float)canReadS16Le(frame.buf[6], frame.buf[7]) / 100.0f;
+  hasGlvVoltage = true;
+  isScreenDirty = true;
 }
 
-void handlePm100ParamResponseFrame(const CAN_message_t &msg) {
-  if (msg.len < 3) {
+void inverterHandleParamResponseFrame(const CAN_message_t &frame) {
+  if (frame.len < 3) {
     return;
   }
 
-  uint16_t address = u16Le(msg.buf[0], msg.buf[1]);
+  uint16_t address = canReadU16Le(frame.buf[0], frame.buf[1]);
   if (address == PM100_PARAM_CAN_ACTIVE_MSGS) {
     Serial.print("[PM100] CAN Active Messages parameter write ");
-    Serial.println(msg.buf[2] ? "succeeded" : "FAILED");
+    Serial.println(frame.buf[2] ? "succeeded" : "FAILED");
   } else if (address == PM100_PARAM_FAULT_CLEAR) {
     Serial.print("[PM100] Fault clear command ");
-    Serial.println(msg.buf[2] ? "accepted" : "REJECTED");
+    Serial.println(frame.buf[2] ? "accepted" : "REJECTED");
   }
 }
 
@@ -152,8 +152,8 @@ void handlePm100ParamResponseFrame(const CAN_message_t &msg) {
 // in the inverter's EEPROM broadcast mask. If the inverter is alive but 0x0A9
 // stays silent, write parameter 148 to enable all broadcast messages.
 // EEPROM parameters are only writable while the motor is not running.
-void servicePm100BroadcastEnable() {
-  if (haveGlvVoltage || !havePm100Traffic || readyToDriveLatched) {
+void inverterServiceBroadcastEnable() {
+  if (hasGlvVoltage || !hasPm100Traffic || isReadyToDriveLatched) {
     return;
   }
 
@@ -161,38 +161,38 @@ void servicePm100BroadcastEnable() {
     return;
   }
 
-  uint32_t now = millis();
-  if (now - firstPm100FrameMs < PM100_BROADCAST_ENABLE_DELAY_MS) {
+  uint32_t nowMs = millis();
+  if (nowMs - firstPm100FrameMs < PM100_BROADCAST_ENABLE_DELAY_MS) {
     return;
   }
 
   if (pm100BroadcastEnableAttempts > 0 &&
-      now - pm100BroadcastEnableLastTxMs < PM100_BROADCAST_ENABLE_RETRY_MS) {
+      nowMs - pm100BroadcastEnableLastTxMs < PM100_BROADCAST_ENABLE_RETRY_MS) {
     return;
   }
 
   pm100BroadcastEnableAttempts++;
-  pm100BroadcastEnableLastTxMs = now;
+  pm100BroadcastEnableLastTxMs = nowMs;
 
   Serial.print("[PM100] No 0x0A9 Internal Voltages frames; enabling broadcasts, attempt ");
   Serial.println(pm100BroadcastEnableAttempts);
-  sendPm100BroadcastEnable();
+  inverterSendBroadcastEnable();
 }
 
-void sendPm100BroadcastEnable() {
-  CAN_message_t tx = {};
-  tx.id = PM100_PARAM_COMMAND_ID;
-  tx.len = 8;
-  tx.flags.extended = 0;
-  tx.buf[0] = (uint8_t)(PM100_PARAM_CAN_ACTIVE_MSGS & 0xFF);
-  tx.buf[1] = (uint8_t)(PM100_PARAM_CAN_ACTIVE_MSGS >> 8);
-  tx.buf[2] = 1;     // write
-  tx.buf[3] = 0;     // reserved
-  tx.buf[4] = 0xFF;  // CAN Active Messages Lo Word: enable all broadcasts
-  tx.buf[5] = 0xFF;
-  tx.buf[6] = 0xFF;  // Hi Word: keep command/BMS/OBD2 mailboxes enabled
-  tx.buf[7] = 0xFF;
-  sendCanFrame(tx);
+void inverterSendBroadcastEnable() {
+  CAN_message_t txFrame = {};
+  txFrame.id = PM100_PARAM_COMMAND_ID;
+  txFrame.len = 8;
+  txFrame.flags.extended = 0;
+  txFrame.buf[0] = (uint8_t)(PM100_PARAM_CAN_ACTIVE_MSGS & 0xFF);
+  txFrame.buf[1] = (uint8_t)(PM100_PARAM_CAN_ACTIVE_MSGS >> 8);
+  txFrame.buf[2] = 1;     // write
+  txFrame.buf[3] = 0;     // reserved
+  txFrame.buf[4] = 0xFF;  // CAN Active Messages Lo Word: enable all broadcasts
+  txFrame.buf[5] = 0xFF;
+  txFrame.buf[6] = 0xFF;  // Hi Word: keep command/BMS/OBD2 mailboxes enabled
+  txFrame.buf[7] = 0xFF;
+  canSendFrame(txFrame);
 }
 
 // Automatically clears latched PM100 faults over CAN once the conditions that
@@ -202,18 +202,18 @@ void sendPm100BroadcastEnable() {
 // power-cycles the inverter. Fault Clear is a command parameter (not an EEPROM
 // write), so it is safe to send any time; a fault whose cause is still present
 // simply latches again.
-void servicePm100FaultClear() {
-  if (!havePm100FaultStatus || !pm100Fault) {
+void inverterServiceFaultClear() {
+  if (!hasPm100FaultStatus || !hasPm100Fault) {
     return;
   }
 
-  if (!haveBmsStatus || contactorsOpen()) {
+  if (!hasBmsStatus || bmsAreContactorsOpen()) {
     pm100FaultClearAttempts = 0;
     return;
   }
 
-  if (!haveInverterVoltageInfo ||
-      inverterDcBusVoltage < PM100_FAULT_CLEAR_MIN_BUS_V) {
+  if (!hasInverterVoltageInfo ||
+      inverterDcBusVoltageV < PM100_FAULT_CLEAR_MIN_BUS_V) {
     return;
   }
 
@@ -221,56 +221,56 @@ void servicePm100FaultClear() {
     return;
   }
 
-  uint32_t now = millis();
+  uint32_t nowMs = millis();
   if (pm100FaultClearAttempts > 0 &&
-      now - pm100FaultClearLastTxMs < PM100_FAULT_CLEAR_RETRY_MS) {
+      nowMs - pm100FaultClearLastTxMs < PM100_FAULT_CLEAR_RETRY_MS) {
     return;
   }
 
   pm100FaultClearAttempts++;
-  pm100FaultClearLastTxMs = now;
+  pm100FaultClearLastTxMs = nowMs;
 
   Serial.print("[PM100] Fault latched with contactors closed and bus at ");
-  Serial.print(inverterDcBusVoltage, 1);
+  Serial.print(inverterDcBusVoltageV, 1);
   Serial.print(" V; sending fault clear, attempt ");
   Serial.println(pm100FaultClearAttempts);
-  sendPm100FaultClear();
+  inverterSendFaultClear();
 }
 
-void sendPm100FaultClear() {
-  CAN_message_t tx = {};
-  tx.id = PM100_PARAM_COMMAND_ID;
-  tx.len = 8;
-  tx.flags.extended = 0;
-  tx.buf[0] = (uint8_t)(PM100_PARAM_FAULT_CLEAR & 0xFF);
-  tx.buf[1] = (uint8_t)(PM100_PARAM_FAULT_CLEAR >> 8);
-  tx.buf[2] = 1;  // write
-  tx.buf[3] = 0;  // reserved
-  tx.buf[4] = 0;  // data 0 = clear all faults
-  tx.buf[5] = 0;
-  tx.buf[6] = 0;
-  tx.buf[7] = 0;
-  sendCanFrame(tx);
+void inverterSendFaultClear() {
+  CAN_message_t txFrame = {};
+  txFrame.id = PM100_PARAM_COMMAND_ID;
+  txFrame.len = 8;
+  txFrame.flags.extended = 0;
+  txFrame.buf[0] = (uint8_t)(PM100_PARAM_FAULT_CLEAR & 0xFF);
+  txFrame.buf[1] = (uint8_t)(PM100_PARAM_FAULT_CLEAR >> 8);
+  txFrame.buf[2] = 1;  // write
+  txFrame.buf[3] = 0;  // reserved
+  txFrame.buf[4] = 0;  // data 0 = clear all faults
+  txFrame.buf[5] = 0;
+  txFrame.buf[6] = 0;
+  txFrame.buf[7] = 0;
+  canSendFrame(txFrame);
 }
 
-void handlePm100FaultCodesFrame(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void inverterHandleFaultCodesFrame(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     return;
   }
 
-  bool previousFault = havePm100FaultStatus && pm100Fault;
-  pm100PostFaults = u32Le(msg.buf[0], msg.buf[1], msg.buf[2], msg.buf[3]);
-  pm100RunFaults = u32Le(msg.buf[4], msg.buf[5], msg.buf[6], msg.buf[7]);
-  havePm100FaultStatus = true;
-  pm100Fault = (pm100PostFaults != 0 || pm100RunFaults != 0);
-  if (pm100Fault && !previousFault) {
-    showFaultBanner(firstPm100FaultName(pm100PostFaults, pm100RunFaults));
+  bool previousFault = hasPm100FaultStatus && hasPm100Fault;
+  pm100PostFaults = canReadU32Le(frame.buf[0], frame.buf[1], frame.buf[2], frame.buf[3]);
+  pm100RunFaults = canReadU32Le(frame.buf[4], frame.buf[5], frame.buf[6], frame.buf[7]);
+  hasPm100FaultStatus = true;
+  hasPm100Fault = (pm100PostFaults != 0 || pm100RunFaults != 0);
+  if (hasPm100Fault && !previousFault) {
+    dashShowFaultBanner(faultTextGetFirstPm100(pm100PostFaults, pm100RunFaults));
   }
-  if (!pm100Fault) {
+  if (!hasPm100Fault) {
     if (previousFault && pm100FaultClearAttempts > 0) {
       Serial.println("[PM100] Faults cleared");
     }
     pm100FaultClearAttempts = 0;
   }
-  screenDirty = true;
+  isScreenDirty = true;
 }

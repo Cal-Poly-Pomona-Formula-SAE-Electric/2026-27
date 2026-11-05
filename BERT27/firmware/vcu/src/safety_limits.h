@@ -74,7 +74,7 @@ static const int16_t  POWER_DERATE_BATT_TEMP_C   = 50;     // >  trips (rolling 
 
 // ---------------- Ready to drive, inverter fault clear, timeouts, TSSI ----------------
 // Set false to bypass brake-press requirement when bench testing without pedals.
-static constexpr bool REQUIRE_BRAKE_FOR_RTD = true;
+static constexpr bool IS_BRAKE_REQUIRED_FOR_RTD = true;
 static constexpr float PM100_FAULT_CLEAR_MIN_BUS_V = 240.0f;
 static constexpr uint32_t PM100_FAULT_CLEAR_RETRY_MS = 2000;
 static constexpr uint8_t PM100_FAULT_CLEAR_MAX_ATTEMPTS = 3;

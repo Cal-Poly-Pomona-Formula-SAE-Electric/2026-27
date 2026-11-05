@@ -28,31 +28,31 @@
 #include "data_log.h"
 #include "fault_text.h"
 
-void resetDisplay();
-char checkIfTouchedRaw(int x, int y);
-void formatCellVoltageText(char *buffer, size_t bufferSize, uint16_t millivolts, bool valid);
-void formatCellTempText(char *buffer, size_t bufferSize, int16_t tempC, bool valid);
-void formatTemperatureTenthsText(char *buffer, size_t bufferSize, int16_t tempTenthsC, bool valid);
-void drawDashboardLabel(int x, int y, const char *label);
-void drawTileFrame(int x, int y, const char *label);
-void drawDerateBanner(bool force);
-uint16_t motorTempColor(float tempC, bool valid);
-uint16_t batteryTempColor(int tempC, bool valid);
-uint16_t cellSpreadColor(int spreadMv, bool valid);
-void drawCachedDashboardText(int x, int y, int w, int h, uint8_t textSize,
-                             const char *value, uint16_t valueColor,
-                             char *lastValue, size_t lastValueSize,
-                             uint16_t &lastColor, bool force);
-void drawDriveButtons(bool force);
-void drawStatusText(int x, int y, const char *label, const char *value, uint16_t valueColor);
-void drawStatusText(int x, int y, const char *label, int value, const char *units, uint16_t valueColor);
-void drawShutdownStatusIndicators(bool force);
-void drawShutdownStatusIndicator(int x, int y, const char *label, bool high,
-                                 int &lastState, bool force);
-void drawFaultBanner(bool force);
+void dashReset();
+char dashCheckIfTouchedRaw(int x, int y);
+void dashFormatCellVoltageText(char *buffer, size_t bufferSize, uint16_t millivolts, bool isValid);
+void dashFormatCellTempText(char *buffer, size_t bufferSize, int16_t tempC, bool isValid);
+void dashFormatTemperatureTenthsText(char *buffer, size_t bufferSize, int16_t tempTenthsC, bool isValid);
+void dashDrawLabel(int x, int y, const char *label);
+void dashDrawTileFrame(int x, int y, const char *label);
+void dashDrawDerateBanner(bool isForced);
+uint16_t dashGetMotorTempColor(float tempC, bool isValid);
+uint16_t dashGetBatteryTempColor(int tempC, bool isValid);
+uint16_t dashGetCellSpreadColor(int spreadMv, bool isValid);
+void dashDrawCachedText(int x, int y, int w, int h, uint8_t textSize,
+                        const char *value, uint16_t valueColor,
+                        char *lastValue, size_t lastValueSize,
+                        uint16_t &lastColor, bool isForced);
+void dashDrawDriveButtons(bool isForced);
+void dashDrawStatusText(int x, int y, const char *label, const char *value, uint16_t valueColor);
+void dashDrawStatusText(int x, int y, const char *label, int value, const char *units, uint16_t valueColor);
+void dashDrawShutdownStatusIndicators(bool isForced);
+void dashDrawShutdownStatusIndicator(int x, int y, const char *label, bool high,
+                                     int &lastState, bool isForced);
+void dashDrawFaultBanner(bool isForced);
 
-ST7796_t3 tft(TFT_CS, TFT_DC, TFT_RST);
-XPT2046_Touchscreen ts(TOUCH_CS, TOUCH_IRQ);
+ST7796_t3 dashTft(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
+XPT2046_Touchscreen dashTouch(PIN_TOUCH_CS, PIN_TOUCH_IRQ);
 
 static constexpr uint32_t FAULT_BANNER_DURATION_MS = 5000;
 
@@ -62,66 +62,66 @@ static constexpr float EM_TEMP_SCALE_C = 0.5f;        // degC = raw * 0.5
 // fault, shown for FAULT_BANNER_DURATION_MS after each fault event.
 char faultBannerText[48] = "";
 uint32_t faultBannerUntilMs = 0;
-bool faultBannerVisible = false;
-bool faultBannerDirty = false;
+bool isFaultBannerVisible = false;
+bool isFaultBannerDirty = false;
 
-int backlightBrightness = 255;
-bool screenDirty = true;
-bool dashboardNeedsFullRedraw = true;
+int backlightPwm = 255;
+bool isScreenDirty = true;
+bool isDashFullRedrawNeeded = true;
 
 // ---------------- Display / touch ----------------
-void setupDisplay() {
-  SPI.setMOSI(TFT_MOSI);
-  SPI.setMISO(TFT_MISO);
-  SPI.setSCK(TFT_SCK);
+void dashSetup() {
+  SPI.setMOSI(PIN_TFT_MOSI);
+  SPI.setMISO(PIN_TFT_MISO);
+  SPI.setSCK(PIN_TFT_SCK);
 
-  pinMode(TFT_RST, OUTPUT);
-  digitalWrite(TFT_RST, HIGH);
+  pinMode(PIN_TFT_RST, OUTPUT);
+  digitalWrite(PIN_TFT_RST, HIGH);
 
-  pinMode(TFT_LED, OUTPUT);
-  analogWriteFrequency(TFT_LED, 20000);
-  analogWrite(TFT_LED, backlightBrightness);
+  pinMode(PIN_TFT_LED, OUTPUT);
+  analogWriteFrequency(PIN_TFT_LED, 20000);
+  analogWrite(PIN_TFT_LED, backlightPwm);
 
-  resetDisplay();
+  dashReset();
 
-  ts.begin();
-  ts.setRotation(1);
+  dashTouch.begin();
+  dashTouch.setRotation(1);
 
-  tft.init(320, 480);
-  tft.setRotation(135);
-  tft.fillScreen(ST7735_BLACK);
-  dashboardNeedsFullRedraw = true;
-  screenDirty = true;
+  dashTft.init(320, 480);
+  dashTft.setRotation(135);
+  dashTft.fillScreen(ST7735_BLACK);
+  isDashFullRedrawNeeded = true;
+  isScreenDirty = true;
 }
 
-void resetDisplay() {
-  digitalWrite(TFT_RST, HIGH);
+void dashReset() {
+  digitalWrite(PIN_TFT_RST, HIGH);
   delay(20);
-  digitalWrite(TFT_RST, LOW);
+  digitalWrite(PIN_TFT_RST, LOW);
   delay(20);
-  digitalWrite(TFT_RST, HIGH);
+  digitalWrite(PIN_TFT_RST, HIGH);
   delay(150);
 }
 
-void handleTouch() {
+void dashHandleTouch() {
   // RTD owns driveMode: D while ready to drive, N in every other RTD state.
   return;
 
-  if (!ts.touched()) {
+  if (!dashTouch.touched()) {
     return;
   }
 
-  TS_Point p = ts.getPoint();
-  char newMode = checkIfTouchedRaw(p.x, p.y);
+  TS_Point touchPoint = dashTouch.getPoint();
+  char newMode = dashCheckIfTouchedRaw(touchPoint.x, touchPoint.y);
   if (newMode && newMode != driveMode) {
-    setDriveMode(newMode);
+    rtdSetDriveMode(newMode);
 
     Serial.print("[Touch] Drive mode ");
     Serial.println(driveMode);
   }
 }
 
-char checkIfTouchedRaw(int x, int y) {
+char dashCheckIfTouchedRaw(int x, int y) {
   const int yMin = 2650;
   const int yMax = 3500;
 
@@ -132,12 +132,12 @@ char checkIfTouchedRaw(int x, int y) {
   return 0;
 }
 
-void drawDashboard() {
+void dashDraw() {
   // Primary-tile value caches (Zone B).
   static char lastSpeed[12] = "";   static uint16_t lastSpeedColor = ST7735_WHITE;
   static char lastDistance[20] = ""; static uint16_t lastDistanceColor = ST7735_WHITE;
-  static char lastBatT[12] = "";    static uint16_t lastBatTColor = ST7735_WHITE;
-  static char lastMtrT[12] = "";    static uint16_t lastMtrTColor = ST7735_WHITE;
+  static char lastBattTemp[12] = "";    static uint16_t lastBattTempColor = ST7735_WHITE;
+  static char lastMotorTemp[12] = "";    static uint16_t lastMotorTempColor = ST7735_WHITE;
   static char lastSpread[12] = "";  static uint16_t lastSpreadColor = ST7735_WHITE;
   static char lastPackV[12] = "";   static uint16_t lastPackVColor = ST7735_WHITE;
   static char lastMode[12] = "";    static uint16_t lastModeColor = ST7735_WHITE;
@@ -151,293 +151,293 @@ void drawDashboard() {
   static char lastBms[24] = "";     static uint16_t lastBmsColor = ST7735_WHITE;
   static char lastInv[24] = "";     static uint16_t lastInvColor = ST7735_WHITE;
   static char lastCtr[16] = "";     static uint16_t lastCtrColor = ST7735_WHITE;
-  static char lastVmn[16] = "";     static uint16_t lastVmnColor = ST7735_WHITE;
-  static char lastVmx[16] = "";     static uint16_t lastVmxColor = ST7735_WHITE;
-  static char lastTmn[16] = "";     static uint16_t lastTmnColor = ST7735_WHITE;
-  static char lastTmx[16] = "";     static uint16_t lastTmxColor = ST7735_WHITE;
+  static char lastMinCellV[16] = "";     static uint16_t lastMinCellVColor = ST7735_WHITE;
+  static char lastMaxCellV[16] = "";     static uint16_t lastMaxCellVColor = ST7735_WHITE;
+  static char lastMinCellTemp[16] = "";     static uint16_t lastMinCellTempColor = ST7735_WHITE;
+  static char lastMaxCellTemp[16] = "";     static uint16_t lastMaxCellTempColor = ST7735_WHITE;
   static char lastGlv[16] = "";     static uint16_t lastGlvColor = ST7735_WHITE;
   static char lastPack[16] = "";    static uint16_t lastPackColor = ST7735_WHITE;
-  static char lastInvt[16] = "";    static uint16_t lastInvtColor = ST7735_WHITE;
+  static char lastInverterTemp[16] = "";    static uint16_t lastInverterTempColor = ST7735_WHITE;
   static char lastFan[16] = "";     static uint16_t lastFanColor = ST7735_WHITE;
-  static char lastEmV[24] = "";     static uint16_t lastEmVColor = ST7735_WHITE;
-  static char lastEmT[32] = "";     static uint16_t lastEmTColor = ST7735_WHITE;
-  static char lastEmF[24] = "";     static uint16_t lastEmFColor = ST7735_WHITE;
+  static char lastEmVoltage[24] = "";     static uint16_t lastEmVoltageColor = ST7735_WHITE;
+  static char lastEmTemp[32] = "";     static uint16_t lastEmTempColor = ST7735_WHITE;
+  static char lastEmStatus[24] = "";     static uint16_t lastEmStatusColor = ST7735_WHITE;
   static char lastFault[24] = "";   static uint16_t lastFaultColor = ST7735_WHITE;
   static char lastSd[24] = "";      static uint16_t lastSdColor = ST7735_WHITE;
 
-  bool force = dashboardNeedsFullRedraw;
+  bool isForced = isDashFullRedrawNeeded;
 
-  if (force) {
-    tft.fillScreen(ST7735_BLACK);
-    tft.setTextColor(ST7735_WHITE);
-    tft.setTextSize(2);
-    tft.setCursor(6, 6);
-    tft.print("BERT26");
+  if (isForced) {
+    dashTft.fillScreen(ST7735_BLACK);
+    dashTft.setTextColor(ST7735_WHITE);
+    dashTft.setTextSize(2);
+    dashTft.setCursor(6, 6);
+    dashTft.print("BERT26");
 
     // Six primary tiles: 3 columns x 2 rows.
-    drawTileFrame(2, 32, "SPEED");
-    drawTileFrame(162, 32, "BAT T");
-    drawTileFrame(322, 32, "MTR T");
-    drawTileFrame(2, 136, "SPREAD");
-    drawTileFrame(162, 136, "PACK V");
-    drawTileFrame(322, 136, "MODE");
+    dashDrawTileFrame(2, 32, "SPEED");
+    dashDrawTileFrame(162, 32, "BAT T");
+    dashDrawTileFrame(322, 32, "MTR T");
+    dashDrawTileFrame(2, 136, "SPREAD");
+    dashDrawTileFrame(162, 136, "PACK V");
+    dashDrawTileFrame(322, 136, "MODE");
 
-    dashboardNeedsFullRedraw = false;
+    isDashFullRedrawNeeded = false;
   }
 
   char value[32];
 
   // ---- Header: SD/session status and power-derate banner ----
   uint16_t sdColor;
-  if (!sdCardStarted) {
+  if (!isSdCardStarted) {
     snprintf(value, sizeof(value), "SD:NO LOG:----");
     sdColor = ST7735_RED;
   } else {
-    snprintf(value, sizeof(value), "SD:%s LOG:%04lu", sdLogActive ? "OK" : "ERR",
+    snprintf(value, sizeof(value), "SD:%s LOG:%04lu", isSdLogActive ? "OK" : "ERR",
              (unsigned long)logSessionNumber);
-    sdColor = sdLogActive ? ST7735_GREEN : ST7735_YELLOW;
+    sdColor = isSdLogActive ? ST7735_GREEN : ST7735_YELLOW;
   }
-  drawCachedDashboardText(100, 5, 196, 18, 1, value, sdColor,
-                          lastSd, sizeof(lastSd), lastSdColor, force);
-  drawDerateBanner(force);
+  dashDrawCachedText(100, 5, 196, 18, 1, value, sdColor,
+                     lastSd, sizeof(lastSd), lastSdColor, isForced);
+  dashDrawDerateBanner(isForced);
 
   // ---- Zone B: large primary tiles (value cell = tileX+6, tileY+34) ----
   snprintf(value, sizeof(value), "%.0f", speedMph);
-  drawCachedDashboardText(8, 66, 144, 48, 5, value, ST7735_WHITE,
-                          lastSpeed, sizeof(lastSpeed), lastSpeedColor, force);
+  dashDrawCachedText(8, 66, 144, 48, 5, value, ST7735_WHITE,
+                     lastSpeed, sizeof(lastSpeed), lastSpeedColor, isForced);
 
   snprintf(value, sizeof(value), "RUN:%.2fkm", cumulativeDistanceKm);
-  drawCachedDashboardText(8, 118, 144, 10, 1, value, ST7735_WHITE,
-                          lastDistance, sizeof(lastDistance), lastDistanceColor, force);
+  dashDrawCachedText(8, 118, 144, 10, 1, value, ST7735_WHITE,
+                     lastDistance, sizeof(lastDistance), lastDistanceColor, isForced);
 
-  bool battTempValid = haveCellTempStats && maxCellTempC != CELL_TEMP_UNKNOWN_C;
-  if (battTempValid) {
+  bool isBattTempValid = hasCellTempStats && maxCellTempC != CELL_TEMP_UNKNOWN_C;
+  if (isBattTempValid) {
     snprintf(value, sizeof(value), "%dC", (int)maxCellTempC);
   } else {
     snprintf(value, sizeof(value), "--");
   }
-  drawCachedDashboardText(168, 66, 144, 48, 4, value,
-                          batteryTempColor((int)maxCellTempC, battTempValid),
-                          lastBatT, sizeof(lastBatT), lastBatTColor, force);
+  dashDrawCachedText(168, 66, 144, 48, 4, value,
+                     dashGetBatteryTempColor((int)maxCellTempC, isBattTempValid),
+                     lastBattTemp, sizeof(lastBattTemp), lastBattTempColor, isForced);
 
   {
-    float motorC = (float)pm100MotorTempTenthsC / 10.0f;
-    if (havePm100MotorTemp) {
-      snprintf(value, sizeof(value), "%.0fC", motorC);
+    float shownMotorTempC = (float)pm100MotorTempTenthsC / 10.0f;
+    if (hasPm100MotorTemp) {
+      snprintf(value, sizeof(value), "%.0fC", shownMotorTempC);
     } else {
       snprintf(value, sizeof(value), "--");
     }
-    drawCachedDashboardText(328, 66, 144, 48, 4, value,
-                            motorTempColor(motorC, havePm100MotorTemp),
-                            lastMtrT, sizeof(lastMtrT), lastMtrTColor, force);
+    dashDrawCachedText(328, 66, 144, 48, 4, value,
+                       dashGetMotorTempColor(shownMotorTempC, hasPm100MotorTemp),
+                       lastMotorTemp, sizeof(lastMotorTemp), lastMotorTempColor, isForced);
   }
 
   {
-    int spread = (int)maxCellVoltageMv - (int)minCellVoltageMv;
-    if (haveCellVoltageStats) {
-      snprintf(value, sizeof(value), "%dmV", spread);
+    int spreadMv = (int)maxCellVoltageMv - (int)minCellVoltageMv;
+    if (hasCellVoltageStats) {
+      snprintf(value, sizeof(value), "%dmV", spreadMv);
     } else {
       snprintf(value, sizeof(value), "--");
     }
-    drawCachedDashboardText(8, 170, 144, 48, 4, value,
-                            cellSpreadColor(spread, haveCellVoltageStats),
-                            lastSpread, sizeof(lastSpread), lastSpreadColor, force);
+    dashDrawCachedText(8, 170, 144, 48, 4, value,
+                       dashGetCellSpreadColor(spreadMv, hasCellVoltageStats),
+                       lastSpread, sizeof(lastSpread), lastSpreadColor, isForced);
   }
 
-  if (haveInverterVoltageInfo) {
-    snprintf(value, sizeof(value), "%.0fV", inverterDcBusVoltage);
+  if (hasInverterVoltageInfo) {
+    snprintf(value, sizeof(value), "%.0fV", inverterDcBusVoltageV);
   } else {
     snprintf(value, sizeof(value), "--");
   }
-  drawCachedDashboardText(168, 170, 144, 48, 4, value,
-                          haveInverterVoltageInfo ? ST7735_WHITE : ST7735_YELLOW,
-                          lastPackV, sizeof(lastPackV), lastPackVColor, force);
+  dashDrawCachedText(168, 170, 144, 48, 4, value,
+                     hasInverterVoltageInfo ? ST7735_WHITE : ST7735_YELLOW,
+                     lastPackV, sizeof(lastPackV), lastPackVColor, isForced);
 
   {
-    bool inDrive = (driveMode == 'D');
-    const char *modeText = inDrive ? "DRIVE" : "NEUTRAL";
-    drawCachedDashboardText(328, 172, 144, 28, 3, modeText,
-                            inDrive ? ST7735_GREEN : ST7735_WHITE,
-                            lastMode, sizeof(lastMode), lastModeColor, force);
+    bool isInDrive = (driveMode == 'D');
+    const char *modeText = isInDrive ? "DRIVE" : "NEUTRAL";
+    dashDrawCachedText(328, 172, 144, 28, 3, modeText,
+                       isInDrive ? ST7735_GREEN : ST7735_WHITE,
+                       lastMode, sizeof(lastMode), lastModeColor, isForced);
   }
 
   // ---- Zone C: diagnostics strip (size-1 grid) ----
-  const int dc0 = 4, dc1 = 124, dc2 = 244, dc3 = 364;
-  const int dw = 116, dh = 9;
-  const int r0 = 242, r1 = 254, r2 = 266, r3 = 278, r4 = 290, r5 = 303;
+  const int diagCol0XPx = 4, diagCol1XPx = 124, diagCol2XPx = 244, diagCol3XPx = 364;
+  const int diagCellWidthPx = 116, diagCellHeightPx = 9;
+  const int diagRow0YPx = 242, diagRow1YPx = 254, diagRow2YPx = 266, diagRow3YPx = 278, diagRow4YPx = 290, diagRow5YPx = 303;
 
-  bool faultDetectionArmed = bmsImdFaultDetectionArmed();
-  bool bms2026DisplayFault = haveBms2026FaultCode && bms2026FaultCode != 0;
+  bool isFaultDetectionArmed = faultsIsBmsImdDetectionArmed();
+  bool bms2026DisplayFault = hasBms2026FaultCode && bms2026FaultCode != 0;
 
-  // r0: pedal/brake inputs, signed torque request, power, SOC/regen setting.
+  // diagRow0YPx: pedal/brake inputs, signed torque request, power, SOC/regen setting.
   // These pedal-derived diagnostics remain live while TS/RTD is off.
   snprintf(value, sizeof(value), "PED:%.0f%% BRK:%.0f%%", pedalPct, brakePressurePct);
-  drawCachedDashboardText(dc0, r0, dw, dh, 1, value, appsPlausible ? ST7735_GREEN : ST7735_RED,
-                          lastPedal, sizeof(lastPedal), lastPedalColor, force);
+  dashDrawCachedText(diagCol0XPx, diagRow0YPx, diagCellWidthPx, diagCellHeightPx, 1, value, isAppsPlausible ? ST7735_GREEN : ST7735_RED,
+                     lastPedal, sizeof(lastPedal), lastPedalColor, isForced);
 
   snprintf(value, sizeof(value), "CMD:%+.1fNm", displayedCommandTorqueNm);
-  drawCachedDashboardText(dc1, r0, dw, dh, 1, value, ST7735_WHITE,
-                          lastTorque, sizeof(lastTorque), lastTorqueColor, force);
+  dashDrawCachedText(diagCol1XPx, diagRow0YPx, diagCellWidthPx, diagCellHeightPx, 1, value, ST7735_WHITE,
+                     lastTorque, sizeof(lastTorque), lastTorqueColor, isForced);
 
-  bool haveInverterPower = haveInverterVoltageInfo && haveInverterCurrentInfo;
-  if (haveInverterPower) {
+  bool hasInverterPower = hasInverterVoltageInfo && hasInverterCurrentInfo;
+  if (hasInverterPower) {
     snprintf(value, sizeof(value), "PWR:%dkW", (int)roundf(powerKw));
   } else {
     snprintf(value, sizeof(value), "PWR:--");
   }
-  drawCachedDashboardText(dc2, r0, dw, dh, 1, value, haveInverterPower ? ST7735_WHITE : ST7735_YELLOW,
-                          lastPower, sizeof(lastPower), lastPowerColor, force);
+  dashDrawCachedText(diagCol2XPx, diagRow0YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasInverterPower ? ST7735_WHITE : ST7735_YELLOW,
+                     lastPower, sizeof(lastPower), lastPowerColor, isForced);
 
   snprintf(value, sizeof(value), "SOC:%u%% REGEN:%s", (unsigned int)stateOfChargePct,
-           REGEN_ENABLED ? "ON" : "OFF");
-  drawCachedDashboardText(dc3, r0, dw, dh, 1, value,
-                          REGEN_ENABLED ? ST7735_GREEN : ST7735_YELLOW,
-                          lastSoc, sizeof(lastSoc), lastSocColor, force);
+           IS_REGEN_ENABLED ? "ON" : "OFF");
+  dashDrawCachedText(diagCol3XPx, diagRow0YPx, diagCellWidthPx, diagCellHeightPx, 1, value,
+                     IS_REGEN_ENABLED ? ST7735_GREEN : ST7735_YELLOW,
+                     lastSoc, sizeof(lastSoc), lastSocColor, isForced);
 
-  // r1: RPM, BMS status, inverter status, contactor
+  // diagRow1YPx: RPM, BMS status, inverter status, contactor
   snprintf(value, sizeof(value), "RPM:%.0f", (float)motorRpm);
-  drawCachedDashboardText(dc0, r1, dw, dh, 1, value, ST7735_WHITE,
-                          lastRpm, sizeof(lastRpm), lastRpmColor, force);
+  dashDrawCachedText(diagCol0XPx, diagRow1YPx, diagCellWidthPx, diagCellHeightPx, 1, value, ST7735_WHITE,
+                     lastRpm, sizeof(lastRpm), lastRpmColor, isForced);
 
   const char *bmsText = "WAIT";
   uint16_t bmsColor = ST7735_YELLOW;
-  if (!faultDetectionArmed) {
+  if (!isFaultDetectionArmed) {
     bmsText = "STARTUP"; bmsColor = ST7735_YELLOW;
-  } else if (bmsTimedOut) {
+  } else if (isBmsTimedOut) {
     bmsText = "TIMEOUT"; bmsColor = ST7735_RED;
-  } else if (bmsFault || bms2026DisplayFault) {
+  } else if (hasBmsFault || bms2026DisplayFault) {
     bmsText = "FAULT"; bmsColor = ST7735_RED;
-  } else if (bmsActive) {
+  } else if (isBmsActive) {
     bmsText = "ACTIVE"; bmsColor = ST7735_GREEN;
   }
   snprintf(value, sizeof(value), "BMS:%s", bmsText);
-  drawCachedDashboardText(dc1, r1, dw, dh, 1, value, bmsColor,
-                          lastBms, sizeof(lastBms), lastBmsColor, force);
+  dashDrawCachedText(diagCol1XPx, diagRow1YPx, diagCellWidthPx, diagCellHeightPx, 1, value, bmsColor,
+                     lastBms, sizeof(lastBms), lastBmsColor, isForced);
 
   {
     const char *invText;
     uint16_t invColor;
-    if (!havePm100FaultStatus) {
+    if (!hasPm100FaultStatus) {
       invText = "--"; invColor = ST7735_YELLOW;
-    } else if (pm100Fault) {
-      invText = firstPm100FaultName(pm100PostFaults, pm100RunFaults); invColor = ST7735_RED;
+    } else if (hasPm100Fault) {
+      invText = faultTextGetFirstPm100(pm100PostFaults, pm100RunFaults); invColor = ST7735_RED;
     } else {
       invText = "OK"; invColor = ST7735_GREEN;
     }
     snprintf(value, sizeof(value), "INV:%s", invText);
-    drawCachedDashboardText(dc2, r1, dw, dh, 1, value, invColor,
-                            lastInv, sizeof(lastInv), lastInvColor, force);
+    dashDrawCachedText(diagCol2XPx, diagRow1YPx, diagCellWidthPx, diagCellHeightPx, 1, value, invColor,
+                       lastInv, sizeof(lastInv), lastInvColor, isForced);
   }
 
   {
-    bool ctrClosed = haveBmsStatus && (bmsFlags & 0x02) != 0;
-    const char *ctrText = !haveBmsStatus ? "--" : (ctrClosed ? "CLOSED" : "OPEN");
-    uint16_t ctrColor = !haveBmsStatus ? ST7735_YELLOW : (ctrClosed ? ST7735_GREEN : ST7735_RED);
+    bool areContactorsClosed = hasBmsStatus && (bmsFlags & 0x02) != 0;
+    const char *ctrText = !hasBmsStatus ? "--" : (areContactorsClosed ? "CLOSED" : "OPEN");
+    uint16_t ctrColor = !hasBmsStatus ? ST7735_YELLOW : (areContactorsClosed ? ST7735_GREEN : ST7735_RED);
     snprintf(value, sizeof(value), "CTR:%s", ctrText);
-    drawCachedDashboardText(dc3, r1, dw, dh, 1, value, ctrColor,
-                            lastCtr, sizeof(lastCtr), lastCtrColor, force);
+    dashDrawCachedText(diagCol3XPx, diagRow1YPx, diagCellWidthPx, diagCellHeightPx, 1, value, ctrColor,
+                       lastCtr, sizeof(lastCtr), lastCtrColor, isForced);
   }
 
-  // r2: cell voltage min/max, cell temp min/max
-  if (haveCellVoltageStats) snprintf(value, sizeof(value), "Vmn:%.3f", minCellVoltageMv / 1000.0f);
+  // diagRow2YPx: cell voltage min/max, cell temp min/max
+  if (hasCellVoltageStats) snprintf(value, sizeof(value), "Vmn:%.3f", minCellVoltageMv / 1000.0f);
   else snprintf(value, sizeof(value), "Vmn:--");
-  drawCachedDashboardText(dc0, r2, dw, dh, 1, value, haveCellVoltageStats ? ST7735_WHITE : ST7735_YELLOW,
-                          lastVmn, sizeof(lastVmn), lastVmnColor, force);
+  dashDrawCachedText(diagCol0XPx, diagRow2YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasCellVoltageStats ? ST7735_WHITE : ST7735_YELLOW,
+                     lastMinCellV, sizeof(lastMinCellV), lastMinCellVColor, isForced);
 
-  if (haveCellVoltageStats) snprintf(value, sizeof(value), "Vmx:%.3f", maxCellVoltageMv / 1000.0f);
+  if (hasCellVoltageStats) snprintf(value, sizeof(value), "Vmx:%.3f", maxCellVoltageMv / 1000.0f);
   else snprintf(value, sizeof(value), "Vmx:--");
-  drawCachedDashboardText(dc1, r2, dw, dh, 1, value, haveCellVoltageStats ? ST7735_WHITE : ST7735_YELLOW,
-                          lastVmx, sizeof(lastVmx), lastVmxColor, force);
+  dashDrawCachedText(diagCol1XPx, diagRow2YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasCellVoltageStats ? ST7735_WHITE : ST7735_YELLOW,
+                     lastMaxCellV, sizeof(lastMaxCellV), lastMaxCellVColor, isForced);
 
-  if (haveCellTempStats && minCellTempC != CELL_TEMP_UNKNOWN_C) snprintf(value, sizeof(value), "Tmn:%dC", (int)minCellTempC);
+  if (hasCellTempStats && minCellTempC != CELL_TEMP_UNKNOWN_C) snprintf(value, sizeof(value), "Tmn:%dC", (int)minCellTempC);
   else snprintf(value, sizeof(value), "Tmn:--");
-  drawCachedDashboardText(dc2, r2, dw, dh, 1, value, haveCellTempStats ? ST7735_WHITE : ST7735_YELLOW,
-                          lastTmn, sizeof(lastTmn), lastTmnColor, force);
+  dashDrawCachedText(diagCol2XPx, diagRow2YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasCellTempStats ? ST7735_WHITE : ST7735_YELLOW,
+                     lastMinCellTemp, sizeof(lastMinCellTemp), lastMinCellTempColor, isForced);
 
-  if (haveCellTempStats && maxCellTempC != CELL_TEMP_UNKNOWN_C) snprintf(value, sizeof(value), "Tmx:%dC", (int)maxCellTempC);
+  if (hasCellTempStats && maxCellTempC != CELL_TEMP_UNKNOWN_C) snprintf(value, sizeof(value), "Tmx:%dC", (int)maxCellTempC);
   else snprintf(value, sizeof(value), "Tmx:--");
-  drawCachedDashboardText(dc3, r2, dw, dh, 1, value, haveCellTempStats ? ST7735_WHITE : ST7735_YELLOW,
-                          lastTmx, sizeof(lastTmx), lastTmxColor, force);
+  dashDrawCachedText(diagCol3XPx, diagRow2YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasCellTempStats ? ST7735_WHITE : ST7735_YELLOW,
+                     lastMaxCellTemp, sizeof(lastMaxCellTemp), lastMaxCellTempColor, isForced);
 
-  // r3: GLV, BMS pack voltage, inverter temp, fan
+  // diagRow3YPx: GLV, BMS pack voltage, inverter temp, fan
   {
     uint16_t glvColor;
-    if (!haveGlvVoltage) {
+    if (!hasGlvVoltage) {
       snprintf(value, sizeof(value), "GLV:--"); glvColor = ST7735_YELLOW;
     } else {
-      snprintf(value, sizeof(value), "GLV:%.1fV", glvVoltage);
-      glvColor = (glvVoltage < GLV_LOW_VOLTAGE_WARN_V) ? ST7735_RED : ST7735_WHITE;
+      snprintf(value, sizeof(value), "GLV:%.1fV", glvVoltageV);
+      glvColor = (glvVoltageV < GLV_LOW_VOLTAGE_WARN_V) ? ST7735_RED : ST7735_WHITE;
     }
-    drawCachedDashboardText(dc0, r3, dw, dh, 1, value, glvColor,
-                            lastGlv, sizeof(lastGlv), lastGlvColor, force);
+    dashDrawCachedText(diagCol0XPx, diagRow3YPx, diagCellWidthPx, diagCellHeightPx, 1, value, glvColor,
+                       lastGlv, sizeof(lastGlv), lastGlvColor, isForced);
   }
 
-  if (haveCellVoltageStats) snprintf(value, sizeof(value), "PACK:%.0fV", packVoltage);
+  if (hasCellVoltageStats) snprintf(value, sizeof(value), "PACK:%.0fV", packVoltageV);
   else snprintf(value, sizeof(value), "PACK:--");
-  drawCachedDashboardText(dc1, r3, dw, dh, 1, value, haveCellVoltageStats ? ST7735_WHITE : ST7735_YELLOW,
-                          lastPack, sizeof(lastPack), lastPackColor, force);
+  dashDrawCachedText(diagCol1XPx, diagRow3YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasCellVoltageStats ? ST7735_WHITE : ST7735_YELLOW,
+                     lastPack, sizeof(lastPack), lastPackColor, isForced);
 
-  if (haveInverterTemp) snprintf(value, sizeof(value), "INVT:%.1fC", inverterTempTenthsC / 10.0f);
+  if (hasInverterTemp) snprintf(value, sizeof(value), "INVT:%.1fC", inverterTempTenthsC / 10.0f);
   else snprintf(value, sizeof(value), "INVT:--");
-  drawCachedDashboardText(dc2, r3, dw, dh, 1, value, haveInverterTemp ? ST7735_WHITE : ST7735_YELLOW,
-                          lastInvt, sizeof(lastInvt), lastInvtColor, force);
+  dashDrawCachedText(diagCol2XPx, diagRow3YPx, diagCellWidthPx, diagCellHeightPx, 1, value, hasInverterTemp ? ST7735_WHITE : ST7735_YELLOW,
+                     lastInverterTemp, sizeof(lastInverterTemp), lastInverterTempColor, isForced);
 
   {
-    int fan1Duty = constrain(fan1DutyPercent, 0, 100);
-    int fan2Duty = constrain(fan2DutyPercent, 0, 100);
-    snprintf(value, sizeof(value), "FAN:%d/%d", fan1Duty, fan2Duty);
-    drawCachedDashboardText(dc3, r3, dw, dh, 1, value, ST7735_WHITE,
-                            lastFan, sizeof(lastFan), lastFanColor, force);
+    int fan1ShownDutyPct = constrain(fan1DutyPct, 0, 100);
+    int fan2ShownDutyPct = constrain(fan2DutyPct, 0, 100);
+    snprintf(value, sizeof(value), "FAN:%d/%d", fan1ShownDutyPct, fan2ShownDutyPct);
+    dashDrawCachedText(diagCol3XPx, diagRow3YPx, diagCellWidthPx, diagCellHeightPx, 1, value, ST7735_WHITE,
+                       lastFan, sizeof(lastFan), lastFanColor, isForced);
   }
 
-  // r4: energy meter V / T / status (shutdown chips occupy the far right)
+  // diagRow4YPx: energy meter V / T / status (shutdown chips occupy the far right)
   {
-    bool emComms = (haveEmMeasurement || haveEmStatus || haveEmTemps) && !emTimedOut;
-    uint16_t liveColor = emComms ? ST7735_WHITE : ST7735_YELLOW;
+    bool hasEmComms = (hasEmMeasurement || hasEmStatus || hasEmTemps) && !isEmTimedOut;
+    uint16_t liveColor = hasEmComms ? ST7735_WHITE : ST7735_YELLOW;
 
-    if (haveEmMeasurement) snprintf(value, sizeof(value), "EMV:%.1fV", emVoltageV);
+    if (hasEmMeasurement) snprintf(value, sizeof(value), "EMV:%.1fV", emVoltageV);
     else snprintf(value, sizeof(value), "EMV:--");
-    drawCachedDashboardText(dc0, r4, dw, dh, 1, value, liveColor,
-                            lastEmV, sizeof(lastEmV), lastEmVColor, force);
+    dashDrawCachedText(diagCol0XPx, diagRow4YPx, diagCellWidthPx, diagCellHeightPx, 1, value, liveColor,
+                       lastEmVoltage, sizeof(lastEmVoltage), lastEmVoltageColor, isForced);
 
-    if (haveEmTempSummary) {
-      snprintf(value, sizeof(value), "EMT:%u %d-%dC", emNumSensors,
+    if (hasEmTempSummary) {
+      snprintf(value, sizeof(value), "EMT:%u %d-%dC", emSensorCount,
                (int)((float)emMinTempRaw * EM_TEMP_SCALE_C),
                (int)((float)emMaxTempRaw * EM_TEMP_SCALE_C));
     } else {
       snprintf(value, sizeof(value), "EMT:--");
     }
-    drawCachedDashboardText(dc1, r4, dw, dh, 1, value, liveColor,
-                            lastEmT, sizeof(lastEmT), lastEmTColor, force);
+    dashDrawCachedText(diagCol1XPx, diagRow4YPx, diagCellWidthPx, diagCellHeightPx, 1, value, liveColor,
+                       lastEmTemp, sizeof(lastEmTemp), lastEmTempColor, isForced);
 
     uint16_t emColor;
-    const char *emText = emStatusSummaryText(emColor);
+    const char *emText = emGetStatusSummaryText(emColor);
     snprintf(value, sizeof(value), "EM:%s", emText);
-    drawCachedDashboardText(dc2, r4, 112, dh, 1, value, emColor,
-                            lastEmF, sizeof(lastEmF), lastEmFColor, force);
+    dashDrawCachedText(diagCol2XPx, diagRow4YPx, 112, diagCellHeightPx, 1, value, emColor,
+                       lastEmStatus, sizeof(lastEmStatus), lastEmStatusColor, isForced);
   }
 
-  // r5: wide fault text (left of the shutdown chips)
+  // diagRow5YPx: wide fault text (left of the shutdown chips)
   {
-    const char *faultText = dashboardFaultText();
-    bool faultActive = pm100Fault ||
-                       (faultDetectionArmed &&
-                        (anyFaultActive() || bmsTimedOut || imdCanTimedOut || bms2026DisplayFault));
-    uint16_t faultColor = faultActive ? ST7735_RED : (faultDetectionArmed ? ST7735_GREEN : ST7735_YELLOW);
+    const char *faultText = faultTextGetForDashboard();
+    bool isFaultActive = hasPm100Fault ||
+                       (isFaultDetectionArmed &&
+                        (faultsIsAnyActive() || isBmsTimedOut || isImdCanTimedOut || bms2026DisplayFault));
+    uint16_t faultColor = isFaultActive ? ST7735_RED : (isFaultDetectionArmed ? ST7735_GREEN : ST7735_YELLOW);
     snprintf(value, sizeof(value), "FAULT:%s", faultText);
-    drawCachedDashboardText(dc0, r5, 350, dh, 1, value, faultColor,
-                            lastFault, sizeof(lastFault), lastFaultColor, force);
+    dashDrawCachedText(diagCol0XPx, diagRow5YPx, 350, diagCellHeightPx, 1, value, faultColor,
+                       lastFault, sizeof(lastFault), lastFaultColor, isForced);
   }
 
-  drawShutdownStatusIndicators(force);
+  dashDrawShutdownStatusIndicators(isForced);
 
-  if (faultBannerVisible) {
-    drawFaultBanner(force);
+  if (isFaultBannerVisible) {
+    dashDrawFaultBanner(isForced);
   }
 }
 
-void formatCellVoltageText(char *buffer, size_t bufferSize, uint16_t millivolts, bool valid) {
-  if (!valid) {
+void dashFormatCellVoltageText(char *buffer, size_t bufferSize, uint16_t millivolts, bool isValid) {
+  if (!isValid) {
     snprintf(buffer, bufferSize, "--");
     return;
   }
@@ -445,8 +445,8 @@ void formatCellVoltageText(char *buffer, size_t bufferSize, uint16_t millivolts,
   snprintf(buffer, bufferSize, "%.3fV", (float)millivolts / 1000.0f);
 }
 
-void formatCellTempText(char *buffer, size_t bufferSize, int16_t tempC, bool valid) {
-  if (!valid || tempC == CELL_TEMP_UNKNOWN_C) {
+void dashFormatCellTempText(char *buffer, size_t bufferSize, int16_t tempC, bool isValid) {
+  if (!isValid || tempC == CELL_TEMP_UNKNOWN_C) {
     snprintf(buffer, bufferSize, "--");
     return;
   }
@@ -454,8 +454,8 @@ void formatCellTempText(char *buffer, size_t bufferSize, int16_t tempC, bool val
   snprintf(buffer, bufferSize, "%dC", (int)tempC);
 }
 
-void formatTemperatureTenthsText(char *buffer, size_t bufferSize, int16_t tempTenthsC, bool valid) {
-  if (!valid) {
+void dashFormatTemperatureTenthsText(char *buffer, size_t bufferSize, int16_t tempTenthsC, bool isValid) {
+  if (!isValid) {
     snprintf(buffer, bufferSize, "--");
     return;
   }
@@ -463,113 +463,113 @@ void formatTemperatureTenthsText(char *buffer, size_t bufferSize, int16_t tempTe
   snprintf(buffer, bufferSize, "%.1fC", (float)tempTenthsC / 10.0f);
 }
 
-void drawDashboardLabel(int x, int y, const char *label) {
-  tft.setTextSize(2);
-  tft.setTextColor(ST7735_WHITE);
-  tft.setCursor(x, y);
-  tft.print(label);
-  tft.print(": ");
+void dashDrawLabel(int x, int y, const char *label) {
+  dashTft.setTextSize(2);
+  dashTft.setTextColor(ST7735_WHITE);
+  dashTft.setCursor(x, y);
+  dashTft.print(label);
+  dashTft.print(": ");
 }
 
 // One 156x100 primary tile: rounded border + size-2 title in the top-left.
 // Drawn only on a full redraw; the value cell inside is repainted incrementally.
-void drawTileFrame(int x, int y, const char *label) {
-  tft.drawRoundRect(x, y, 156, 100, 6, ST7735_WHITE);
-  tft.setTextSize(2);
-  tft.setTextColor(ST7735_WHITE);
-  tft.setCursor(x + 6, y + 6);
-  tft.print(label);
+void dashDrawTileFrame(int x, int y, const char *label) {
+  dashTft.drawRoundRect(x, y, 156, 100, 6, ST7735_WHITE);
+  dashTft.setTextSize(2);
+  dashTft.setTextColor(ST7735_WHITE);
+  dashTft.setCursor(x + 6, y + 6);
+  dashTft.print(label);
 }
 
 // Red "DERATE <n>kW" banner in the header while the power limiter is active;
 // cleared to black when not. Custom drawn (filled box, not the text cache).
 // Redraws on the active/inactive transition and whenever the shown (rounded)
 // kW changes, so the linear voltage derate is reflected live.
-void drawDerateBanner(bool force) {
+void dashDrawDerateBanner(bool isForced) {
   static bool lastDerate = false;
   static int  lastShownKw = -1;
-  static bool initialized = false;
+  static bool isInitialized = false;
   int shownKw = (int)roundf(powerDerateKw);
-  if (!force && initialized && powerDerateActive == lastDerate &&
-      (!powerDerateActive || shownKw == lastShownKw)) {
+  if (!isForced && isInitialized && isPowerDerateActive == lastDerate &&
+      (!isPowerDerateActive || shownKw == lastShownKw)) {
     return;
   }
-  initialized = true;
-  lastDerate = powerDerateActive;
+  isInitialized = true;
+  lastDerate = isPowerDerateActive;
   lastShownKw = shownKw;
 
   const int x = 300, y = 2, w = 176, h = 24;
-  if (powerDerateActive) {
+  if (isPowerDerateActive) {
     char banner[20];
     snprintf(banner, sizeof(banner), "DERATE %dkW", shownKw);
-    tft.fillRect(x, y, w, h, ST7735_RED);
-    tft.setTextSize(2);
-    tft.setTextColor(ST7735_BLACK);
-    tft.setCursor(x + 8, y + 5);
-    tft.print(banner);
-    tft.setTextColor(ST7735_WHITE);
+    dashTft.fillRect(x, y, w, h, ST7735_RED);
+    dashTft.setTextSize(2);
+    dashTft.setTextColor(ST7735_BLACK);
+    dashTft.setCursor(x + 8, y + 5);
+    dashTft.print(banner);
+    dashTft.setTextColor(ST7735_WHITE);
   } else {
-    tft.fillRect(x, y, w, h, ST7735_BLACK);
+    dashTft.fillRect(x, y, w, h, ST7735_BLACK);
   }
 }
 
 // Color bands (user-specified). Invalid/no-data is shown yellow.
-uint16_t motorTempColor(float tempC, bool valid) {
-  if (!valid) return ST7735_YELLOW;
+uint16_t dashGetMotorTempColor(float tempC, bool isValid) {
+  if (!isValid) return ST7735_YELLOW;
   if (tempC >= 95.0f) return ST7735_RED;
   if (tempC >= 65.0f) return ST7735_YELLOW;
   return ST7735_BLUE;
 }
 
-uint16_t batteryTempColor(int tempC, bool valid) {
-  if (!valid) return ST7735_YELLOW;
+uint16_t dashGetBatteryTempColor(int tempC, bool isValid) {
+  if (!isValid) return ST7735_YELLOW;
   if (tempC > 45) return ST7735_RED;
   if (tempC >= 30) return ST7735_YELLOW;
   return ST7735_BLUE;
 }
 
-uint16_t cellSpreadColor(int spreadMv, bool valid) {
-  if (!valid) return ST7735_YELLOW;
+uint16_t dashGetCellSpreadColor(int spreadMv, bool isValid) {
+  if (!isValid) return ST7735_YELLOW;
   if (spreadMv > 200) return ST7735_RED;
   if (spreadMv >= 100) return ST7735_YELLOW;
   return ST7735_GREEN;
 }
 
-void drawCachedDashboardText(int x, int y, int w, int h, uint8_t textSize,
-                             const char *value, uint16_t valueColor,
-                             char *lastValue, size_t lastValueSize,
-                             uint16_t &lastColor, bool force) {
-  if (!force && strcmp(value, lastValue) == 0 && valueColor == lastColor) {
+void dashDrawCachedText(int x, int y, int w, int h, uint8_t textSize,
+                        const char *value, uint16_t valueColor,
+                        char *lastValue, size_t lastValueSize,
+                        uint16_t &lastColor, bool isForced) {
+  if (!isForced && strcmp(value, lastValue) == 0 && valueColor == lastColor) {
     return;
   }
 
-  tft.fillRect(x, y, w, h, ST7735_BLACK);
-  tft.setTextSize(textSize);
-  tft.setTextColor(valueColor);
-  tft.setCursor(x, y);
-  tft.print(value);
-  tft.setTextColor(ST7735_WHITE);
+  dashTft.fillRect(x, y, w, h, ST7735_BLACK);
+  dashTft.setTextSize(textSize);
+  dashTft.setTextColor(valueColor);
+  dashTft.setCursor(x, y);
+  dashTft.print(value);
+  dashTft.setTextColor(ST7735_WHITE);
 
   strncpy(lastValue, value, lastValueSize - 1);
   lastValue[lastValueSize - 1] = '\0';
   lastColor = valueColor;
 }
 
-void drawDriveButtons(bool force) {
+void dashDrawDriveButtons(bool isForced) {
   static char lastDriveMode = 0;
 
-  if (!force && driveMode == lastDriveMode) {
+  if (!isForced && driveMode == lastDriveMode) {
     return;
   }
 
-  int y = (int)(tft.height() * 0.72f);
+  int y = (int)(dashTft.height() * 0.72f);
   int buttonW = 72;
   int buttonH = 54;
   int startX = 42;
   int gap = 24;
 
   // Clear only the button band; the cell-stats column at x>=335 shares this row.
-  tft.fillRect(0, y - 8, 320, buttonH + 16, ST7735_BLACK);
+  dashTft.fillRect(0, y - 8, 320, buttonH + 16, ST7735_BLACK);
 
   const char modes[2] = {'D', 'N'};
   for (int i = 0; i < 2; i++) {
@@ -577,51 +577,51 @@ void drawDriveButtons(bool force) {
     bool selected = (driveMode == modes[i]);
     uint16_t color = selected ? ST7735_RED : ST7735_WHITE;
 
-    tft.drawRoundRect(x, y, buttonW, buttonH, 6, color);
-    tft.setTextSize(4);
-    tft.setTextColor(color);
-    tft.setCursor(x + 24, y + 12);
-    tft.print(modes[i]);
+    dashTft.drawRoundRect(x, y, buttonW, buttonH, 6, color);
+    dashTft.setTextSize(4);
+    dashTft.setTextColor(color);
+    dashTft.setCursor(x + 24, y + 12);
+    dashTft.print(modes[i]);
   }
 
-  tft.setTextColor(ST7735_WHITE);
+  dashTft.setTextColor(ST7735_WHITE);
   lastDriveMode = driveMode;
 }
 
-void drawStatusText(int x, int y, const char *label, const char *value, uint16_t valueColor) {
-  tft.setTextSize(2);
-  tft.setTextColor(ST7735_WHITE);
-  tft.setCursor(x, y);
-  tft.print(label);
-  tft.print(": ");
-  tft.setTextColor(valueColor);
-  tft.print(value);
-  tft.setTextColor(ST7735_WHITE);
+void dashDrawStatusText(int x, int y, const char *label, const char *value, uint16_t valueColor) {
+  dashTft.setTextSize(2);
+  dashTft.setTextColor(ST7735_WHITE);
+  dashTft.setCursor(x, y);
+  dashTft.print(label);
+  dashTft.print(": ");
+  dashTft.setTextColor(valueColor);
+  dashTft.print(value);
+  dashTft.setTextColor(ST7735_WHITE);
 }
 
-void drawStatusText(int x, int y, const char *label, int value, const char *units, uint16_t valueColor) {
+void dashDrawStatusText(int x, int y, const char *label, int value, const char *units, uint16_t valueColor) {
   char text[16];
   snprintf(text, sizeof(text), "%d%s", value, units);
-  drawStatusText(x, y, label, text, valueColor);
+  dashDrawStatusText(x, y, label, text, valueColor);
 }
 
 // Shutdown-circuit status lights: GPIO HIGH = green, LOW = red.
-void drawShutdownStatusIndicators(bool force) {
+void dashDrawShutdownStatusIndicators(bool isForced) {
   static int lastBspd = -1;
   static int lastImd = -1;
   static int lastBms = -1;
 
-  drawShutdownStatusIndicator(362, 291, "BSPD", digitalRead(BSPD_STATUS_PIN) == HIGH,
-                              lastBspd, force);
-  drawShutdownStatusIndicator(402, 291, "IMD", digitalRead(IMD_STATUS_PIN) == HIGH,
-                              lastImd, force);
-  drawShutdownStatusIndicator(442, 291, "BMS", digitalRead(BMS_STATUS_PIN) == HIGH,
-                              lastBms, force);
+  dashDrawShutdownStatusIndicator(362, 291, "BSPD", digitalRead(PIN_BSPD_STATUS) == HIGH,
+                                  lastBspd, isForced);
+  dashDrawShutdownStatusIndicator(402, 291, "IMD", digitalRead(PIN_IMD_STATUS) == HIGH,
+                                  lastImd, isForced);
+  dashDrawShutdownStatusIndicator(442, 291, "BMS", digitalRead(PIN_BMS_STATUS) == HIGH,
+                                  lastBms, isForced);
 }
 
-void drawShutdownStatusIndicator(int x, int y, const char *label, bool high,
-                                 int &lastState, bool force) {
-  if (!force && (int)high == lastState) {
+void dashDrawShutdownStatusIndicator(int x, int y, const char *label, bool high,
+                                     int &lastState, bool isForced) {
+  if (!isForced && (int)high == lastState) {
     return;
   }
   lastState = (int)high;
@@ -629,61 +629,61 @@ void drawShutdownStatusIndicator(int x, int y, const char *label, bool high,
   const int w = 36;
   const int h = 16;
   uint16_t color = high ? ST7735_GREEN : ST7735_RED;
-  tft.fillRoundRect(x, y, w, h, 4, color);
-  tft.setTextSize(1);
-  tft.setTextColor(ST7735_BLACK);
+  dashTft.fillRoundRect(x, y, w, h, 4, color);
+  dashTft.setTextSize(1);
+  dashTft.setTextColor(ST7735_BLACK);
   int textW = (int)strlen(label) * 6;
-  tft.setCursor(x + (w - textW) / 2, y + 4);
-  tft.print(label);
-  tft.setTextColor(ST7735_WHITE);
+  dashTft.setCursor(x + (w - textW) / 2, y + 4);
+  dashTft.print(label);
+  dashTft.setTextColor(ST7735_WHITE);
 }
 
-void showFaultBanner(const char *text) {
+void dashShowFaultBanner(const char *text) {
   if (text == nullptr || text[0] == '\0') {
     return;
   }
 
-  if (!faultBannerVisible || strcmp(text, faultBannerText) != 0) {
+  if (!isFaultBannerVisible || strcmp(text, faultBannerText) != 0) {
     strncpy(faultBannerText, text, sizeof(faultBannerText) - 1);
     faultBannerText[sizeof(faultBannerText) - 1] = '\0';
-    faultBannerDirty = true;
+    isFaultBannerDirty = true;
   }
-  faultBannerVisible = true;
+  isFaultBannerVisible = true;
   faultBannerUntilMs = millis() + FAULT_BANNER_DURATION_MS;
-  screenDirty = true;
+  isScreenDirty = true;
 }
 
-void serviceFaultBanner() {
-  if (!faultBannerVisible) {
+void dashServiceFaultBanner() {
+  if (!isFaultBannerVisible) {
     return;
   }
 
   if ((int32_t)(millis() - faultBannerUntilMs) >= 0) {
-    faultBannerVisible = false;
+    isFaultBannerVisible = false;
     faultBannerText[0] = '\0';
-    dashboardNeedsFullRedraw = true;
-    screenDirty = true;
+    isDashFullRedrawNeeded = true;
+    isScreenDirty = true;
   }
 }
 
 // Draws the fault banner over the drive-button row; the row is repainted via
 // a full redraw when the banner expires.
-void drawFaultBanner(bool force) {
-  if (!force && !faultBannerDirty) {
+void dashDrawFaultBanner(bool isForced) {
+  if (!isForced && !isFaultBannerDirty) {
     return;
   }
-  faultBannerDirty = false;
+  isFaultBannerDirty = false;
 
-  int y = (int)(tft.height() * 0.72f) - 8;
+  int y = (int)(dashTft.height() * 0.72f) - 8;
   int h = 54 + 16;
 
-  tft.fillRect(0, y, tft.width(), h, ST7735_RED);
-  tft.setTextSize(2);
-  tft.setTextColor(ST7735_WHITE);
-  tft.setCursor(12, y + 8);
-  tft.print("FAULT");
-  tft.setTextSize(3);
-  tft.setCursor(12, y + 32);
-  tft.print(faultBannerText);
-  tft.setTextColor(ST7735_WHITE);
+  dashTft.fillRect(0, y, dashTft.width(), h, ST7735_RED);
+  dashTft.setTextSize(2);
+  dashTft.setTextColor(ST7735_WHITE);
+  dashTft.setCursor(12, y + 8);
+  dashTft.print("FAULT");
+  dashTft.setTextSize(3);
+  dashTft.setCursor(12, y + 32);
+  dashTft.print(faultBannerText);
+  dashTft.setTextColor(ST7735_WHITE);
 }

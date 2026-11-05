@@ -17,19 +17,19 @@ extern float apps1Pct;
 extern float apps2Pct;
 extern float pedalPct;
 extern float desiredTorqueNm;
-extern bool appsPlausible;
+extern bool isAppsPlausible;
 extern const char *appsFaultText;
-extern bool bspcActive;
-extern int rawApps1Last;
-extern int rawApps2Last;
-extern int rawBse1Last;
-extern int rawBse2Last;
+extern bool isBspcActive;
+extern int apps1RawLast;
+extern int apps2RawLast;
+extern int bse1RawLast;
+extern int bse2RawLast;
 extern float brakePressurePct;
-extern bool braking;
-extern bool hardBraking;
+extern bool isBraking;
+extern bool isHardBraking;
 
-void updatePedal();
-void logAppsTelemetry();
-void updateBrakePressureSensors();
+void pedalsUpdate();
+void pedalsLogAppsTelemetry();
+void pedalsUpdateBrakePressureSensors();
 
 #endif  // VCU_PEDALS_H

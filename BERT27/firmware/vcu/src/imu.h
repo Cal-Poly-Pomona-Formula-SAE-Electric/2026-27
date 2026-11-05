@@ -11,7 +11,7 @@
 
 #include <Arduino.h>
 
-void writeImuLogRecord(uint32_t nowMs);
-void setupImu();
+void imuWriteLogRecord(uint32_t nowMs);
+void imuSetup();
 
 #endif  // VCU_IMU_H

@@ -49,33 +49,33 @@ void setup() {
 
   Serial.begin(115200);
 
-  pinMode(BUZZER_PIN, OUTPUT);
-  noTone(BUZZER_PIN);
+  pinMode(PIN_BUZZER, OUTPUT);
+  noTone(PIN_BUZZER);
 
-  setupFans();
+  fansSetup();
 
-  pinMode(READY_BUTTON_PIN, INPUT);
-  readyButtonLast = readReadyButtonPressed();
-  refreshRtdStateFromInputs();
+  pinMode(PIN_READY_BUTTON, INPUT);
+  wasReadyButtonPressed = rtdReadButtonPressed();
+  rtdRefreshStateFromInputs();
 
   analogReadResolution(ADC_RESOLUTION_BITS);
-  pinMode(APPS_1_PIN, INPUT);
-  pinMode(APPS_2_PIN, INPUT);
-  pinMode(BSE_1_PIN, INPUT);
-  pinMode(BSE_2_PIN, INPUT);
-  pinMode(HV_CURRENT_SENSE_PIN, INPUT);
+  pinMode(PIN_APPS_1, INPUT);
+  pinMode(PIN_APPS_2, INPUT);
+  pinMode(PIN_BSE_1, INPUT);
+  pinMode(PIN_BSE_2, INPUT);
+  pinMode(PIN_HV_CURRENT_SENSE, INPUT);
 
-  pinMode(BRAKE_LIGHT_PIN, OUTPUT);
-  digitalWrite(BRAKE_LIGHT_PIN, LOW);
+  pinMode(PIN_BRAKE_LIGHT, OUTPUT);
+  digitalWrite(PIN_BRAKE_LIGHT, LOW);
 
   // Pulldowns so a disconnected status line reads LOW and shows red.
-  pinMode(BSPD_STATUS_PIN, INPUT_PULLDOWN);
-  pinMode(IMD_STATUS_PIN, INPUT_PULLDOWN);
-  pinMode(BMS_STATUS_PIN, INPUT_PULLDOWN);
+  pinMode(PIN_BSPD_STATUS, INPUT_PULLDOWN);
+  pinMode(PIN_IMD_STATUS, INPUT_PULLDOWN);
+  pinMode(PIN_BMS_STATUS, INPUT_PULLDOWN);
 
-  setupTssi();
-  setupVehicleCan();
-  setupPm100CommandTimer();
+  tssiSetup();
+  canSetup();
+  inverterCmdSetupTimer();
 
   while (!Serial && millis() < 1500) {}
 
@@ -84,76 +84,76 @@ void setup() {
   Serial.print(STARTUP_BMS_IMD_FAULT_DELAY_MS);
   Serial.println(" ms");
 
-  setupImu();
+  imuSetup();
 
-  setupDataLogging();
+  logSetup();
 
-  setupDisplay();
+  dashSetup();
 
-  drawDashboard();
+  dashDraw();
 }
 
 // ---------------- Main loop ----------------
 void loop() {
-  handleSerialConsoleInput();
-  updateFanDutyFromTemps();
-  serviceFans();
-  receiveCanFrames();
-  updateBrakePressureSensors();
-  updatePedal();
-  digitalWrite(BRAKE_LIGHT_PIN, braking ? HIGH : LOW);
-  logAppsTelemetry();
-  serviceReadyToDrive();
-  serviceBuzzer();
-  serviceTssi();
-  serviceFaultBanner();
-  handleTouch();
+  consoleHandleInput();
+  fansUpdateDutyFromTemps();
+  fansService();
+  canReceiveFrames();
+  pedalsUpdateBrakePressureSensors();
+  pedalsUpdate();
+  digitalWrite(PIN_BRAKE_LIGHT, isBraking ? HIGH : LOW);
+  pedalsLogAppsTelemetry();
+  rtdService();
+  buzzerService();
+  tssiService();
+  dashServiceFaultBanner();
+  dashHandleTouch();
 
-  uint32_t now = millis();
-  if (bmsImdFaultDetectionArmed() && haveBmsStatus && (now - lastBmsRxMs > BMS_TIMEOUT_MS)) {
-    if (!bmsTimedOut) {
+  uint32_t nowMs = millis();
+  if (faultsIsBmsImdDetectionArmed() && hasBmsStatus && (nowMs - lastBmsRxMs > BMS_TIMEOUT_MS)) {
+    if (!isBmsTimedOut) {
       Serial.println("[BMS] Status timeout"); //,disabling torque
-      showFaultBanner("BMS Timeout");
-      screenDirty = true;
+      dashShowFaultBanner("BMS Timeout");
+      isScreenDirty = true;
     }
-    bmsTimedOut = true;
-    bmsActive = false;
-    bmsFault = true;
-    dropReadyToDrive("BMS Timeout");
+    isBmsTimedOut = true;
+    isBmsActive = false;
+    hasBmsFault = true;
+    rtdDrop("BMS Timeout");
   }
 
-  serviceEnergyMeterTimeout(now);
+  emServiceTimeout(nowMs);
 
-  if (haveInverterVoltageInfo && haveInverterCurrentInfo) {
-    powerKw = (inverterDcBusVoltage * inverterDcBusCurrent) / 1000.0f;
+  if (hasInverterVoltageInfo && hasInverterCurrentInfo) {
+    powerKw = (inverterDcBusVoltageV * inverterDcBusCurrentA) / 1000.0f;
   } else {
     powerKw = 0.0f;
   }
   speedMph = fabsf((float)motorRpm) * MPH_PER_RPM;
   speedKmh = speedMph * KMH_PER_MPH;
-  updateCumulativeDistance(now);
-  servicePowerDerate(now);
-  updatePm100CommandState();
-  servicePm100TxLogging();
-  servicePm100BroadcastEnable();
-  servicePm100FaultClear();
-  serviceCellDataRequests(now);
-  serviceDataLogging();
+  speedUpdateCumulativeDistance(nowMs);
+  derateService(nowMs);
+  inverterCmdUpdateState();
+  inverterCmdServiceTxLogging();
+  inverterServiceBroadcastEnable();
+  inverterServiceFaultClear();
+  bmsServiceCellDataRequests(nowMs);
+  logService();
 
   // Rewrite the entire screen every 2 minutes to wipe any accumulated SPI
   // glitches that the per-cell incremental redraw would otherwise leave behind.
   static uint32_t lastFullRedrawMs = 0;
-  if (now - lastFullRedrawMs >= DASHBOARD_FULL_REDRAW_MS) {
-    lastFullRedrawMs = now;
-    dashboardNeedsFullRedraw = true;
-    screenDirty = true;
+  if (nowMs - lastFullRedrawMs >= DASHBOARD_FULL_REDRAW_MS) {
+    lastFullRedrawMs = nowMs;
+    isDashFullRedrawNeeded = true;
+    isScreenDirty = true;
   }
 
   static uint32_t lastDrawMs = 0;
-  if (screenDirty || now - lastDrawMs >= SCREEN_PERIOD_MS) {
-    lastDrawMs = now;
-    screenDirty = false;
-    drawDashboard();
+  if (isScreenDirty || nowMs - lastDrawMs >= SCREEN_PERIOD_MS) {
+    lastDrawMs = nowMs;
+    isScreenDirty = false;
+    dashDraw();
   }
 }
 

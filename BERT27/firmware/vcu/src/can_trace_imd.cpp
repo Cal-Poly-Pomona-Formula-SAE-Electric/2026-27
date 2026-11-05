@@ -13,80 +13,80 @@
 #include "tssi.h"
 #include "can_trace.h"
 
-void printImdRequestIndexName(uint8_t requestIndex);
-void printImdResponseErrorName(uint8_t errorCode);
-void printImdInfoMessageSelectorName(uint8_t selector);
-void printImdProfileName(uint8_t profile);
-void printImdRIsoStatusName(uint8_t status);
-void printImdDeviceActivityName(uint8_t activity);
-void printImdLockStateName(uint8_t state);
-void printImdEarthliftStateName(uint8_t state);
-void printImdVoltageModeName(uint8_t mode);
-void printImdBaudRateName(uint8_t baudRate);
-void printImdAsciiPayloadFrom(const CAN_message_t &msg, uint8_t startIndex);
-void printImdWordValue(uint16_t value);
-void printImdResistanceValue(uint16_t kohms);
-void printImdVoltageValue(uint16_t raw);
-void printImdCapacityValue(uint16_t raw);
-void printImdPercentValue(uint8_t value);
-void printImdCounterValue(uint8_t value);
+void tracePrintImdRequestIndexName(uint8_t requestIndex);
+void tracePrintImdResponseErrorName(uint8_t errorCode);
+void tracePrintImdInfoMessageSelectorName(uint8_t selector);
+void tracePrintImdProfileName(uint8_t profile);
+void tracePrintImdRIsoStatusName(uint8_t status);
+void tracePrintImdDeviceActivityName(uint8_t activity);
+void tracePrintImdLockStateName(uint8_t state);
+void tracePrintImdEarthliftStateName(uint8_t state);
+void tracePrintImdVoltageModeName(uint8_t mode);
+void tracePrintImdBaudRateName(uint8_t baudRate);
+void tracePrintImdAsciiPayloadFrom(const CAN_message_t &frame, uint8_t startIndex);
+void tracePrintImdWordValue(uint16_t value);
+void tracePrintImdResistanceValue(uint16_t resistanceKohm);
+void tracePrintImdVoltageValue(uint16_t raw);
+void tracePrintImdCapacityValue(uint16_t raw);
+void tracePrintImdPercentValue(uint8_t value);
+void tracePrintImdCounterValue(uint8_t value);
 
-static constexpr int32_t IMD_VOLTAGE_OFFSET   = 32128;
-static constexpr float IMD_VOLTAGE_SCALE      = 0.05f;
+static constexpr int32_t IMD_VOLTAGE_OFFSET_RAW   = 32128;
+static constexpr float IMD_VOLTAGE_V_PER_BIT      = 0.05f;
 
-void printImdRequestTranslation(const CAN_message_t &msg) {
-  if (msg.len < 1) {
+void tracePrintImdRequest(const CAN_message_t &frame) {
+  if (frame.len < 1) {
     Serial.print("short frame, expected request index");
     return;
   }
 
   Serial.print("index=0x");
-  printCanHexByte(msg.buf[0]);
+  tracePrintCanHexByte(frame.buf[0]);
   Serial.print(" (");
-  printImdRequestIndexName(msg.buf[0]);
+  tracePrintImdRequestIndexName(frame.buf[0]);
   Serial.print(") data=");
-  printRawPayloadFrom(msg, 1);
+  tracePrintRawPayloadFrom(frame, 1);
 }
 
-void printImdResponseTranslation(const CAN_message_t &msg) {
-  if (msg.len < 1) {
+void tracePrintImdResponse(const CAN_message_t &frame) {
+  if (frame.len < 1) {
     Serial.print("short frame, expected response index");
     return;
   }
 
-  uint8_t index = msg.buf[0];
+  uint8_t index = frame.buf[0];
 
   if (index == 0xFF) {
     Serial.print("error");
-    if (msg.len >= 2) {
+    if (frame.len >= 2) {
       Serial.print(" code=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      printImdResponseErrorName(msg.buf[1]);
+      tracePrintImdResponseErrorName(frame.buf[1]);
       Serial.print(')');
     }
-    if (msg.len >= 3) {
+    if (frame.len >= 3) {
       Serial.print(" requestedIndex=0x");
-      printCanHexByte(msg.buf[2]);
+      tracePrintCanHexByte(frame.buf[2]);
       Serial.print('(');
-      printImdRequestIndexName(msg.buf[2]);
+      tracePrintImdRequestIndexName(frame.buf[2]);
       Serial.print(')');
     }
     return;
   }
 
   Serial.print("index=0x");
-  printCanHexByte(index);
+  tracePrintCanHexByte(index);
   Serial.print('(');
-  printImdRequestIndexName(index);
+  tracePrintImdRequestIndexName(index);
   Serial.print(") ");
 
-  if (msg.len < 2) {
+  if (frame.len < 2) {
     Serial.print("missing response data");
     return;
   }
 
-  uint16_t word = (msg.len >= 3) ? u16Le(msg.buf[1], msg.buf[2]) : msg.buf[1];
+  uint16_t word = (frame.len >= 3) ? canReadU16Le(frame.buf[1], frame.buf[2]) : frame.buf[1];
 
   switch (index) {
     case 0x0A:
@@ -96,7 +96,7 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x20:
     case 0x22:
       Serial.print("value=");
-      printImdWordValue(word);
+      tracePrintImdWordValue(word);
       break;
 
     case 0x10:
@@ -107,13 +107,13 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x1A:
     case 0x1C:
       Serial.print("ascii=");
-      printImdAsciiPayloadFrom(msg, 1);
+      tracePrintImdAsciiPayloadFrom(frame, 1);
       break;
 
     case 0x2A:
     case 0x2E:
       Serial.print("percent=");
-      printImdPercentValue(msg.buf[1]);
+      tracePrintImdPercentValue(frame.buf[1]);
       break;
 
     case 0x2C:
@@ -121,14 +121,14 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x54:
     case 0x5C:
       Serial.print("counter=");
-      printImdCounterValue(msg.buf[1]);
+      tracePrintImdCounterValue(frame.buf[1]);
       break;
 
     case 0x30:
       Serial.print("selfHoldingAlarm=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      switch (msg.buf[1]) {
+      switch (frame.buf[1]) {
         case 0xFC: Serial.print("automatic alarm reset"); break;
         case 0xFD: Serial.print("self-holding alarm"); break;
         case 0xFE: Serial.print("reserved"); break;
@@ -141,15 +141,15 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x38:
     case 0x3A:
       Serial.print("profile=");
-      Serial.print(msg.buf[1]);
+      Serial.print(frame.buf[1]);
       Serial.print('(');
-      printImdProfileName(msg.buf[1]);
+      tracePrintImdProfileName(frame.buf[1]);
       Serial.print(')');
       break;
 
     case 0x3E:
       Serial.print("quality=");
-      printImdPercentValue(msg.buf[1]);
+      tracePrintImdPercentValue(frame.buf[1]);
       break;
 
     case 0x40:
@@ -160,26 +160,26 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x4E:
     case 0x7E:
       Serial.print("resistance=");
-      printImdResistanceValue(word);
+      tracePrintImdResistanceValue(word);
       break;
 
     case 0x44:
       Serial.print("rIsoStatus=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      printImdRIsoStatusName(msg.buf[1]);
+      tracePrintImdRIsoStatusName(frame.buf[1]);
       Serial.print(')');
       break;
 
     case 0x48:
     case 0x50:
       Serial.print("seconds=");
-      printImdWordValue(word);
+      tracePrintImdWordValue(word);
       break;
 
     case 0x52:
       Serial.print("capacity=");
-      printImdCapacityValue(word);
+      tracePrintImdCapacityValue(word);
       break;
 
     case 0x58:
@@ -198,53 +198,53 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x60:
     case 0x62:
       Serial.print("voltage=");
-      printImdVoltageValue(word);
+      tracePrintImdVoltageValue(word);
       break;
 
     case 0x64:
       Serial.print("mode=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      printImdVoltageModeName(msg.buf[1]);
+      tracePrintImdVoltageModeName(frame.buf[1]);
       Serial.print(')');
       break;
 
     case 0x66:
     case 0x72:
       Serial.print("voltage=");
-      printImdWordValue(word);
+      tracePrintImdWordValue(word);
       Serial.print("V");
       break;
 
     case 0x68:
       Serial.print("deviceActivity=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      printImdDeviceActivityName(msg.buf[1]);
+      tracePrintImdDeviceActivityName(frame.buf[1]);
       Serial.print(')');
       break;
 
     case 0x6A:
     case 0x6B:
       Serial.print("lock=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      printImdLockStateName(msg.buf[1]);
+      tracePrintImdLockStateName(frame.buf[1]);
       Serial.print(')');
       break;
 
     case 0x6C:
       Serial.print("warningsAndAlarms=0x");
       Serial.print(word, HEX);
-      printTssiWarnBits(word);
+      tssiPrintWarnBits(word);
       break;
 
     case 0x70:
     case 0x71:
       Serial.print("earthlift=0x");
-      printCanHexByte(msg.buf[1]);
+      tracePrintCanHexByte(frame.buf[1]);
       Serial.print('(');
-      printImdEarthliftStateName(msg.buf[1]);
+      tracePrintImdEarthliftStateName(frame.buf[1]);
       Serial.print(')');
       break;
 
@@ -261,15 +261,15 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x76:
     case 0x77:
       Serial.print("message=");
-      if (msg.len >= 2) {
-        printImdInfoMessageSelectorName(msg.buf[1]);
+      if (frame.len >= 2) {
+        tracePrintImdInfoMessageSelectorName(frame.buf[1]);
       } else {
         Serial.print("missing");
       }
       Serial.print(" canId=");
-      if (msg.len >= 3) {
+      if (frame.len >= 3) {
         Serial.print("0x");
-        printCanHexByte(msg.buf[2]);
+        tracePrintCanHexByte(frame.buf[2]);
       } else {
         Serial.print("missing");
       }
@@ -278,19 +278,19 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
     case 0x78:
     case 0x79:
       Serial.print("message=");
-      if (msg.len >= 2) {
-        printImdInfoMessageSelectorName(msg.buf[1]);
+      if (frame.len >= 2) {
+        tracePrintImdInfoMessageSelectorName(frame.buf[1]);
       } else {
         Serial.print("missing");
       }
       Serial.print(" period=");
-      if (msg.len >= 3) {
-        if (msg.buf[2] == 0) {
+      if (frame.len >= 3) {
+        if (frame.buf[2] == 0) {
           Serial.print("deactivated");
-        } else if (msg.buf[2] == IMD_SNV_BYTE) {
+        } else if (frame.buf[2] == IMD_SNV_BYTE) {
           Serial.print("SNV");
         } else {
-          Serial.print((uint16_t)msg.buf[2] * 100u);
+          Serial.print((uint16_t)frame.buf[2] * 100u);
           Serial.print("ms");
         }
       } else {
@@ -300,109 +300,109 @@ void printImdResponseTranslation(const CAN_message_t &msg) {
 
     case 0x7B:
       Serial.print("baudRate=");
-      printImdBaudRateName(msg.buf[1]);
+      tracePrintImdBaudRateName(frame.buf[1]);
       break;
 
     default:
       Serial.print("payload=");
-      printRawPayloadFrom(msg, 1);
+      tracePrintRawPayloadFrom(frame, 1);
       break;
   }
 }
 
-void printImdInfoGeneralTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintImdInfoGeneral(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  uint16_t rIsoCorrected = u16Le(msg.buf[0], msg.buf[1]);
-  uint8_t rIsoStatus = msg.buf[2];
-  uint8_t isolationCounter = msg.buf[3];
-  uint8_t warningsLowByte = msg.buf[4];
-  uint8_t reservedByte = msg.buf[5];
-  uint8_t deviceActivity = msg.buf[6];
+  uint16_t rIsoCorrectedKohm = canReadU16Le(frame.buf[0], frame.buf[1]);
+  uint8_t rIsoStatus = frame.buf[2];
+  uint8_t isolationCounter = frame.buf[3];
+  uint8_t warningsLowByte = frame.buf[4];
+  uint8_t reservedByte = frame.buf[5];
+  uint8_t deviceActivity = frame.buf[6];
 
   Serial.print("rIsoCorrected=");
-  printImdResistanceValue(rIsoCorrected);
+  tracePrintImdResistanceValue(rIsoCorrectedKohm);
   Serial.print(" rIsoStatus=0x");
-  printCanHexByte(rIsoStatus);
+  tracePrintCanHexByte(rIsoStatus);
   Serial.print('(');
-  printImdRIsoStatusName(rIsoStatus);
+  tracePrintImdRIsoStatusName(rIsoStatus);
   Serial.print(") isolationCounter=");
-  printImdCounterValue(isolationCounter);
+  tracePrintImdCounterValue(isolationCounter);
   Serial.print(" warningsLow=0x");
-  printCanHexByte(warningsLowByte);
-  printTssiWarnBits(warningsLowByte);
+  tracePrintCanHexByte(warningsLowByte);
+  tssiPrintWarnBits(warningsLowByte);
   Serial.print(" reserved5=0x");
-  printCanHexByte(reservedByte);
+  tracePrintCanHexByte(reservedByte);
   Serial.print(" deviceActivity=0x");
-  printCanHexByte(deviceActivity);
+  tracePrintCanHexByte(deviceActivity);
   Serial.print('(');
-  printImdDeviceActivityName(deviceActivity);
+  tracePrintImdDeviceActivityName(deviceActivity);
   Serial.print(") byte7=0x");
-  printCanHexByte(msg.buf[7]);
+  tracePrintCanHexByte(frame.buf[7]);
 }
 
-void printImdInfoIsolationDetailTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintImdInfoIsolationDetail(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
   Serial.print("rIsoNeg=");
-  printImdResistanceValue(u16Le(msg.buf[0], msg.buf[1]));
+  tracePrintImdResistanceValue(canReadU16Le(frame.buf[0], frame.buf[1]));
   Serial.print(" rIsoPos=");
-  printImdResistanceValue(u16Le(msg.buf[2], msg.buf[3]));
+  tracePrintImdResistanceValue(canReadU16Le(frame.buf[2], frame.buf[3]));
   Serial.print(" rIsoOriginal=");
-  printImdResistanceValue(u16Le(msg.buf[4], msg.buf[5]));
+  tracePrintImdResistanceValue(canReadU16Le(frame.buf[4], frame.buf[5]));
   Serial.print(" isolationCounter=");
-  printImdCounterValue(msg.buf[6]);
+  tracePrintImdCounterValue(frame.buf[6]);
   Serial.print(" quality=");
-  printImdPercentValue(msg.buf[7]);
+  tracePrintImdPercentValue(frame.buf[7]);
 }
 
-void printImdInfoVoltageTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintImdInfoVoltage(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
   Serial.print("hvSystem=");
-  printImdVoltageValue(u16Le(msg.buf[0], msg.buf[1]));
+  tracePrintImdVoltageValue(canReadU16Le(frame.buf[0], frame.buf[1]));
   Serial.print(" hvNegToEarth=");
-  printImdVoltageValue(u16Le(msg.buf[2], msg.buf[3]));
+  tracePrintImdVoltageValue(canReadU16Le(frame.buf[2], frame.buf[3]));
   Serial.print(" hvPosToEarth=");
-  printImdVoltageValue(u16Le(msg.buf[4], msg.buf[5]));
+  tracePrintImdVoltageValue(canReadU16Le(frame.buf[4], frame.buf[5]));
   Serial.print(" voltageCounter=");
-  printImdCounterValue(msg.buf[6]);
+  tracePrintImdCounterValue(frame.buf[6]);
   Serial.print(" byte7=0x");
-  printCanHexByte(msg.buf[7]);
+  tracePrintCanHexByte(frame.buf[7]);
 }
 
-void printImdInfoItSystemTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintImdInfoItSystem(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
   Serial.print("capacity=");
-  printImdCapacityValue(u16Le(msg.buf[0], msg.buf[1]));
+  tracePrintImdCapacityValue(canReadU16Le(frame.buf[0], frame.buf[1]));
   Serial.print(" capacityCounter=");
-  printImdCounterValue(msg.buf[2]);
+  tracePrintImdCounterValue(frame.buf[2]);
   Serial.print(" unbalance=");
-  printImdPercentValue(msg.buf[3]);
+  tracePrintImdPercentValue(frame.buf[3]);
   Serial.print(" unbalanceCounter=");
-  printImdCounterValue(msg.buf[4]);
+  tracePrintImdCounterValue(frame.buf[4]);
   Serial.print(" byte5=0x");
-  printCanHexByte(msg.buf[5]);
+  tracePrintCanHexByte(frame.buf[5]);
   Serial.print(" byte6=0x");
-  printCanHexByte(msg.buf[6]);
+  tracePrintCanHexByte(frame.buf[6]);
   Serial.print(" byte7=0x");
-  printCanHexByte(msg.buf[7]);
+  tracePrintCanHexByte(frame.buf[7]);
 }
 
-void printImdRequestIndexName(uint8_t requestIndex) {
+void tracePrintImdRequestIndexName(uint8_t requestIndex) {
   switch (requestIndex) {
     case 0x0A: Serial.print("bootloader build number"); break;
     case 0x0C: Serial.print("bootloader D-number"); break;
@@ -477,7 +477,7 @@ void printImdRequestIndexName(uint8_t requestIndex) {
   }
 }
 
-void printImdResponseErrorName(uint8_t errorCode) {
+void tracePrintImdResponseErrorName(uint8_t errorCode) {
   switch (errorCode) {
     case 0x23: Serial.print("unknown or invalid request"); break;
     case 0x24: Serial.print("set command failed, parameter locked"); break;
@@ -490,7 +490,7 @@ void printImdResponseErrorName(uint8_t errorCode) {
   }
 }
 
-void printImdInfoMessageSelectorName(uint8_t selector) {
+void tracePrintImdInfoMessageSelectorName(uint8_t selector) {
   switch (selector) {
     case 0x00: Serial.print("Request"); break;
     case 0x01: Serial.print("Response"); break;
@@ -502,7 +502,7 @@ void printImdInfoMessageSelectorName(uint8_t selector) {
   }
 }
 
-void printImdProfileName(uint8_t profile) {
+void tracePrintImdProfileName(uint8_t profile) {
   switch (profile) {
     case 1: Serial.print("standard fast startup"); break;
     case 2: Serial.print("standard"); break;
@@ -515,7 +515,7 @@ void printImdProfileName(uint8_t profile) {
   }
 }
 
-void printImdRIsoStatusName(uint8_t status) {
+void tracePrintImdRIsoStatusName(uint8_t status) {
   switch (status) {
     case 0xFC: Serial.print("startup estimated"); break;
     case 0xFD: Serial.print("startup first measurement"); break;
@@ -525,7 +525,7 @@ void printImdRIsoStatusName(uint8_t status) {
   }
 }
 
-void printImdDeviceActivityName(uint8_t activity) {
+void tracePrintImdDeviceActivityName(uint8_t activity) {
   switch (activity) {
     case 0: Serial.print("initialization"); break;
     case 1: Serial.print("normal operation"); break;
@@ -535,7 +535,7 @@ void printImdDeviceActivityName(uint8_t activity) {
   }
 }
 
-void printImdLockStateName(uint8_t state) {
+void tracePrintImdLockStateName(uint8_t state) {
   switch (state) {
     case 0xFC: Serial.print("parameter write enable"); break;
     case 0xFD: Serial.print("parameter write disable"); break;
@@ -545,7 +545,7 @@ void printImdLockStateName(uint8_t state) {
   }
 }
 
-void printImdEarthliftStateName(uint8_t state) {
+void tracePrintImdEarthliftStateName(uint8_t state) {
   switch (state) {
     case 0:
     case 0xFC: Serial.print("earth connection closed"); break;
@@ -556,7 +556,7 @@ void printImdEarthliftStateName(uint8_t state) {
   }
 }
 
-void printImdVoltageModeName(uint8_t mode) {
+void tracePrintImdVoltageModeName(uint8_t mode) {
   switch (mode) {
     case 0xFD: Serial.print("AC"); break;
     case 0xFE: Serial.print("DC"); break;
@@ -565,7 +565,7 @@ void printImdVoltageModeName(uint8_t mode) {
   }
 }
 
-void printImdBaudRateName(uint8_t baudRate) {
+void tracePrintImdBaudRateName(uint8_t baudRate) {
   switch (baudRate) {
     case 0x01: Serial.print("1 Mbit/s"); break;
     case 0x02: Serial.print("800 kbit/s"); break;
@@ -578,10 +578,10 @@ void printImdBaudRateName(uint8_t baudRate) {
   }
 }
 
-void printImdAsciiPayloadFrom(const CAN_message_t &msg, uint8_t startIndex) {
+void tracePrintImdAsciiPayloadFrom(const CAN_message_t &frame, uint8_t startIndex) {
   Serial.print('"');
-  for (uint8_t i = startIndex; i < msg.len; i++) {
-    uint8_t value = msg.buf[i];
+  for (uint8_t i = startIndex; i < frame.len; i++) {
+    uint8_t value = frame.buf[i];
     if (value == IMD_SNV_BYTE) {
       break;
     }
@@ -594,7 +594,7 @@ void printImdAsciiPayloadFrom(const CAN_message_t &msg, uint8_t startIndex) {
   Serial.print('"');
 }
 
-void printImdWordValue(uint16_t value) {
+void tracePrintImdWordValue(uint16_t value) {
   if (value == IMD_SNV_WORD) {
     Serial.print("SNV");
   } else {
@@ -602,26 +602,26 @@ void printImdWordValue(uint16_t value) {
   }
 }
 
-void printImdResistanceValue(uint16_t kohms) {
-  if (kohms == IMD_SNV_WORD) {
+void tracePrintImdResistanceValue(uint16_t resistanceKohm) {
+  if (resistanceKohm == IMD_SNV_WORD) {
     Serial.print("SNV");
   } else {
-    Serial.print(kohms);
+    Serial.print(resistanceKohm);
     Serial.print("kOhm");
   }
 }
 
-void printImdVoltageValue(uint16_t raw) {
+void tracePrintImdVoltageValue(uint16_t raw) {
   if (raw == IMD_SNV_WORD) {
     Serial.print("SNV");
   } else {
-    float volts = ((int32_t)raw - IMD_VOLTAGE_OFFSET) * IMD_VOLTAGE_SCALE;
-    Serial.print(volts, 2);
+    float voltageV = ((int32_t)raw - IMD_VOLTAGE_OFFSET_RAW) * IMD_VOLTAGE_V_PER_BIT;
+    Serial.print(voltageV, 2);
     Serial.print("V");
   }
 }
 
-void printImdCapacityValue(uint16_t raw) {
+void tracePrintImdCapacityValue(uint16_t raw) {
   if (raw == IMD_SNV_WORD) {
     Serial.print("SNV");
   } else {
@@ -630,7 +630,7 @@ void printImdCapacityValue(uint16_t raw) {
   }
 }
 
-void printImdPercentValue(uint8_t value) {
+void tracePrintImdPercentValue(uint8_t value) {
   if (value == IMD_SNV_BYTE) {
     Serial.print("SNV");
   } else {
@@ -639,6 +639,6 @@ void printImdPercentValue(uint8_t value) {
   }
 }
 
-void printImdCounterValue(uint8_t value) {
+void tracePrintImdCounterValue(uint8_t value) {
   Serial.print(value);
 }

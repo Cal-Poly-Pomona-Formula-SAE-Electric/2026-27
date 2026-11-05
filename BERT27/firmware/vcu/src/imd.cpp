@@ -17,33 +17,33 @@
 #include "fault_text.h"
 #include "dashboard.h"
 
-bool imdFault = true;
+bool hasImdFault = true;
 uint16_t imdWarnAlarms = 0;
 uint16_t imdRIsoKohm = 0xFFFF;
 uint8_t imdRIsoStatus = 0;
 uint8_t imdDeviceActivity = 0;
 uint32_t lastImdRxMs = 0;
-bool imdCanTimedOut = true;
+bool isImdCanTimedOut = true;
 
-void handleImdFrame(const CAN_message_t &msg) {
-  bool wasTimedOut = imdCanTimedOut;
+void imdHandleFrame(const CAN_message_t &frame) {
+  bool wasTimedOut = isImdCanTimedOut;
   uint16_t previousWarnings = imdWarnAlarms;
-  bool previousFault = imdFault;
-  bool faultDetectionArmed = bmsImdFaultDetectionArmed();
+  bool previousFault = hasImdFault;
+  bool isFaultDetectionArmed = faultsIsBmsImdDetectionArmed();
 
-  if (msg.id == IMD_INFO_GENERAL_ID && msg.len >= 5) {
-    imdRIsoKohm = u16Le(msg.buf[0], msg.buf[1]);
-    imdRIsoStatus = msg.buf[2];
-    imdWarnAlarms = (imdWarnAlarms & 0xFF00u) | msg.buf[4];
-    imdDeviceActivity = (msg.len >= 7) ? msg.buf[6] : IMD_SNV_BYTE;
+  if (frame.id == IMD_INFO_GENERAL_ID && frame.len >= 5) {
+    imdRIsoKohm = canReadU16Le(frame.buf[0], frame.buf[1]);
+    imdRIsoStatus = frame.buf[2];
+    imdWarnAlarms = (imdWarnAlarms & 0xFF00u) | frame.buf[4];
+    imdDeviceActivity = (frame.len >= 7) ? frame.buf[6] : IMD_SNV_BYTE;
     lastImdRxMs = millis();
-    imdCanTimedOut = false;
-    imdFault = tssiFaultFromWarnBits(imdWarnAlarms);
-  } else if (msg.id == IMD_RESPONSE_ID && msg.len >= 3 && msg.buf[0] == IDX_WARN_ALARMS) {
-    imdWarnAlarms = u16Le(msg.buf[1], msg.buf[2]);
+    isImdCanTimedOut = false;
+    hasImdFault = tssiHasFaultInWarnBits(imdWarnAlarms);
+  } else if (frame.id == IMD_RESPONSE_ID && frame.len >= 3 && frame.buf[0] == IDX_WARN_ALARMS) {
+    imdWarnAlarms = canReadU16Le(frame.buf[1], frame.buf[2]);
     lastImdRxMs = millis();
-    imdCanTimedOut = false;
-    imdFault = tssiFaultFromWarnBits(imdWarnAlarms);
+    isImdCanTimedOut = false;
+    hasImdFault = tssiHasFaultInWarnBits(imdWarnAlarms);
   } else {
     return;
   }
@@ -52,26 +52,26 @@ void handleImdFrame(const CAN_message_t &msg) {
     Serial.println("[TSSI] IMD CAN restored");
   }
 
-  if (faultDetectionArmed && (imdWarnAlarms != previousWarnings || imdFault != previousFault)) {
+  if (isFaultDetectionArmed && (imdWarnAlarms != previousWarnings || hasImdFault != previousFault)) {
     Serial.print("[TSSI] IMD warn=0x");
     Serial.print(imdWarnAlarms, HEX);
-    printTssiWarnBits(imdWarnAlarms);
+    tssiPrintWarnBits(imdWarnAlarms);
     Serial.print(" => ");
-    Serial.println(imdFault ? "FAULT, red blink" : "OK, green on");
-    if (imdFault && !previousFault) {
-      showFaultBanner(firstTssiFaultName(imdWarnAlarms));
+    Serial.println(hasImdFault ? "FAULT, red blink" : "OK, green on");
+    if (hasImdFault && !previousFault) {
+      dashShowFaultBanner(faultTextGetFirstTssi(imdWarnAlarms));
     }
   }
 }
 
-void requestImdWarnings() {
-  CAN_message_t tx = {};
-  tx.id = IMD_REQUEST_ID;
-  tx.len = 8;
-  tx.flags.extended = 0;
-  tx.buf[0] = IDX_WARN_ALARMS;
+void imdRequestWarnings() {
+  CAN_message_t txFrame = {};
+  txFrame.id = IMD_REQUEST_ID;
+  txFrame.len = 8;
+  txFrame.flags.extended = 0;
+  txFrame.buf[0] = IDX_WARN_ALARMS;
   for (int i = 1; i < 8; i++) {
-    tx.buf[i] = 0xFF;
+    txFrame.buf[i] = 0xFF;
   }
-  sendCanFrame(tx);
+  canSendFrame(txFrame);
 }

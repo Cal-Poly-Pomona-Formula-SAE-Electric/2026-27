@@ -11,9 +11,9 @@
 
 #include <Arduino.h>
 
-bool tssiFaultFromWarnBits(uint16_t warnBits);
-void setupTssi();
-void serviceTssi();
-void printTssiWarnBits(uint16_t bits);
+bool tssiHasFaultInWarnBits(uint16_t warnBits);
+void tssiSetup();
+void tssiService();
+void tssiPrintWarnBits(uint16_t bits);
 
 #endif  // VCU_TSSI_H

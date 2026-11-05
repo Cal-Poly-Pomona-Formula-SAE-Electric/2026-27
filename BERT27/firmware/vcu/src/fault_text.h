@@ -11,11 +11,11 @@
 
 #include <Arduino.h>
 
-const char *dashboardFaultText();
-const char *firstTssiFaultName(uint16_t bits);
-const char *firstPm100FaultName(uint32_t postFaults, uint32_t runFaults);
-const char *bmsTemperatureFaultCodeName(uint8_t faultCode);
-const char *pm100PostFaultName(uint8_t bit);
-const char *pm100RunFaultName(uint8_t bit);
+const char *faultTextGetForDashboard();
+const char *faultTextGetFirstTssi(uint16_t bits);
+const char *faultTextGetFirstPm100(uint32_t postFaults, uint32_t runFaults);
+const char *faultTextGetBmsTemperatureCode(uint8_t faultCode);
+const char *faultTextGetPm100Post(uint8_t bit);
+const char *faultTextGetPm100Run(uint8_t bit);
 
 #endif  // VCU_FAULT_TEXT_H

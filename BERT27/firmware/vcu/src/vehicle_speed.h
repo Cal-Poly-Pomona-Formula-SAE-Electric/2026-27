@@ -16,6 +16,6 @@ extern float speedMph;
 extern float speedKmh;
 extern float cumulativeDistanceKm;
 
-void updateCumulativeDistance(uint32_t nowMs);
+void speedUpdateCumulativeDistance(uint32_t nowMs);
 
 #endif  // VCU_VEHICLE_SPEED_H

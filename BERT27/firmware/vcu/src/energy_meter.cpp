@@ -28,90 +28,90 @@ static constexpr uint32_t EM_TIMEOUT_MS = 1000;
 // absent meter shows "--"/"NO COMMS" instead of stale zeros.
 float emCurrentA = 0.0f;
 float emVoltageV = 0.0f;
-bool haveEmMeasurement = false;
+bool hasEmMeasurement = false;
 uint8_t emStatusByte = 0;
-bool haveEmStatus = false;
-uint8_t emNumSensors = 0;
+bool hasEmStatus = false;
+uint8_t emSensorCount = 0;
 uint8_t emMinTempRaw = 0;
 uint8_t emMaxTempRaw = 0;
-bool haveEmTempSummary = false;
-bool haveEmTemps = false;
+bool hasEmTempSummary = false;
+bool hasEmTemps = false;
 uint32_t emLastRxMs = 0;
-bool emTimedOut = true;
+bool isEmTimedOut = true;
 
 // ---------------- Energy Meter ----------------
 // 0x10D Measurement: Current[A] float (bytes 0-3), Voltage[V] float (bytes 4-7).
-void handleEmMeasurementFrame(const CAN_message_t &msg) {
+void emHandleMeasurementFrame(const CAN_message_t &frame) {
   emLastRxMs = millis();
-  emTimedOut = false;
-  if (msg.len < 8) {
+  isEmTimedOut = false;
+  if (frame.len < 8) {
     return;
   }
-  emCurrentA = f32Le(&msg.buf[0]);
-  emVoltageV = f32Le(&msg.buf[4]);
-  haveEmMeasurement = true;
-  screenDirty = true;
+  emCurrentA = canReadF32Le(&frame.buf[0]);
+  emVoltageV = canReadF32Le(&frame.buf[4]);
+  hasEmMeasurement = true;
+  isScreenDirty = true;
 }
 
 // 0x40D Status: byte 0 holds the status bits (bytes 1-4 are Energy[Whr], unused
 // on the dashboard).
-void handleEmStatusFrame(const CAN_message_t &msg) {
+void emHandleStatusFrame(const CAN_message_t &frame) {
   emLastRxMs = millis();
-  emTimedOut = false;
-  if (msg.len < 1) {
+  isEmTimedOut = false;
+  if (frame.len < 1) {
     return;
   }
-  emStatusByte = msg.buf[0];
-  haveEmStatus = true;
-  screenDirty = true;
+  emStatusByte = frame.buf[0];
+  hasEmStatus = true;
+  isScreenDirty = true;
 }
 
 // 0x60D Temperature: byte 0 bits 0-2 = multiplexor, bits 3-7 = sensor count.
 // The mux-0 frame carries the count plus min/max in bytes 1/2 (degC = raw*0.5),
 // which is all the dashboard needs.
-void handleEmTemperatureFrame(const CAN_message_t &msg) {
+void emHandleTemperatureFrame(const CAN_message_t &frame) {
   emLastRxMs = millis();
-  emTimedOut = false;
-  if (msg.len < 8) {
+  isEmTimedOut = false;
+  if (frame.len < 8) {
     return;
   }
-  if ((msg.buf[0] & 0x07) == 0) {
-    emNumSensors = msg.buf[0] >> 3;
-    emMinTempRaw = msg.buf[1];
-    emMaxTempRaw = msg.buf[2];
-    haveEmTempSummary = true;
+  if ((frame.buf[0] & 0x07) == 0) {
+    emSensorCount = frame.buf[0] >> 3;
+    emMinTempRaw = frame.buf[1];
+    emMaxTempRaw = frame.buf[2];
+    hasEmTempSummary = true;
   }
-  haveEmTemps = true;
-  screenDirty = true;
+  hasEmTemps = true;
+  isScreenDirty = true;
 }
 
 // Flags the EM comms-lost condition once nothing has arrived for EM_TIMEOUT_MS.
-void serviceEnergyMeterTimeout(uint32_t now) {
-  if (!haveEmMeasurement && !haveEmStatus && !haveEmTemps) {
+void emServiceTimeout(uint32_t nowMs) {
+  if (!hasEmMeasurement && !hasEmStatus && !hasEmTemps) {
     return;  // never seen the meter yet; stays "NO COMMS" without a timeout edge
   }
-  emTimedOut = (now - emLastRxMs > EM_TIMEOUT_MS);
+  isEmTimedOut = (nowMs - emLastRxMs > EM_TIMEOUT_MS);
 }
 
 // One-glance EM health string for the main dashboard, with a colour out-param.
-const char *emStatusSummaryText(uint16_t &colorOut) {
-  if (emTimedOut || (!haveEmStatus && !haveEmMeasurement)) {
+const char *emGetStatusSummaryText(uint16_t &colorOut) {
+  if (isEmTimedOut || (!hasEmStatus && !hasEmMeasurement)) {
     colorOut = ST7735_YELLOW;
     return "NO COMMS";
   }
-  if (haveEmStatus && (emStatusByte & EM_STATUS_FAULT_ACTIVE)) {
+  if (hasEmStatus && (emStatusByte & EM_STATUS_FAULT_ACTIVE)) {
     colorOut = ST7735_RED;
     return "FAULT";
   }
-  if (haveEmStatus && (emStatusByte & EM_STATUS_VIOLATION)) {
+  if (hasEmStatus && (emStatusByte & EM_STATUS_VIOLATION)) {
     colorOut = ST7735_RED;
     return "VIOLATION";
   }
-  if (haveEmStatus && (emStatusByte & EM_STATUS_LOGGING)) {
+  if (hasEmStatus && (emStatusByte & EM_STATUS_LOGGING)) {
     colorOut = ST7735_GREEN;
     return "LOGGING";
   }
-  if (haveEmStatus && (emStatusByte & EM_STATUS_FAULT_PREV)) {
+  if (hasEmStatus && (emStatusByte & EM_STATUS_FAULT_PREV)) {
     colorOut = ST7735_YELLOW;
     return "IDLE/PFLT";
   }

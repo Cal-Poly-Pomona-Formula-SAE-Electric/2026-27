@@ -23,17 +23,17 @@ struct DashboardFaultList {
   uint8_t count;
 };
 
-void collectDashboardFaults(DashboardFaultList &faults);
-void appendDashboardFault(DashboardFaultList &faults, const char *text);
-void appendTssiFaultNames(DashboardFaultList &faults, uint16_t bits);
-void appendPm100FaultNames(DashboardFaultList &faults, uint32_t postFaults, uint32_t runFaults);
+void faultTextCollectAll(DashboardFaultList &faults);
+void faultTextAppend(DashboardFaultList &faults, const char *text);
+void faultTextAppendTssi(DashboardFaultList &faults, uint16_t bits);
+void faultTextAppendPm100(DashboardFaultList &faults, uint32_t postFaults, uint32_t runFaults);
 
-const char *dashboardFaultText() {
+const char *faultTextGetForDashboard() {
   DashboardFaultList faults;
-  collectDashboardFaults(faults);
+  faultTextCollectAll(faults);
 
   if (faults.count == 0) {
-    if (!bmsImdFaultDetectionArmed()) {
+    if (!faultsIsBmsImdDetectionArmed()) {
       return "Startup Wait";
     }
     return "No Fault";
@@ -47,52 +47,52 @@ const char *dashboardFaultText() {
   return faults.texts[faultIndex];
 }
 
-void collectDashboardFaults(DashboardFaultList &faults) {
+void faultTextCollectAll(DashboardFaultList &faults) {
   faults.count = 0;
-  bool faultDetectionArmed = bmsImdFaultDetectionArmed();
+  bool isFaultDetectionArmed = faultsIsBmsImdDetectionArmed();
 
-  if (faultDetectionArmed && bmsTimedOut) {
-    appendDashboardFault(faults, "BMS Timeout");
+  if (isFaultDetectionArmed && isBmsTimedOut) {
+    faultTextAppend(faults, "BMS Timeout");
   }
 
-  if (faultDetectionArmed && imdCanTimedOut) {
-    appendDashboardFault(faults, "IMD Timeout");
+  if (isFaultDetectionArmed && isImdCanTimedOut) {
+    faultTextAppend(faults, "IMD Timeout");
   }
 
-  if (faultDetectionArmed) {
-    if (haveBms2026FaultCode && bms2026FaultCode != 0) {
-      appendDashboardFault(faults, bmsTemperatureFaultCodeName(bms2026FaultCode));
-    } else if (bmsFault && haveBmsStatus && !haveBms2026FaultCode) {
-      appendDashboardFault(faults, "BMS Fault");
+  if (isFaultDetectionArmed) {
+    if (hasBms2026FaultCode && bms2026FaultCode != 0) {
+      faultTextAppend(faults, faultTextGetBmsTemperatureCode(bms2026FaultCode));
+    } else if (hasBmsFault && hasBmsStatus && !hasBms2026FaultCode) {
+      faultTextAppend(faults, "BMS Fault");
     }
   }
 
-  if (faultDetectionArmed && imdFault && (imdWarnAlarms != 0 || !imdCanTimedOut)) {
+  if (isFaultDetectionArmed && hasImdFault && (imdWarnAlarms != 0 || !isImdCanTimedOut)) {
     uint8_t beforeCount = faults.count;
-    appendTssiFaultNames(faults, imdWarnAlarms);
+    faultTextAppendTssi(faults, imdWarnAlarms);
     if (faults.count == beforeCount) {
-      appendDashboardFault(faults, "IMD Fault");
+      faultTextAppend(faults, "IMD Fault");
     }
   }
 
-  if (havePm100FaultStatus && pm100Fault) {
+  if (hasPm100FaultStatus && hasPm100Fault) {
     uint8_t beforeCount = faults.count;
-    appendPm100FaultNames(faults, pm100PostFaults, pm100RunFaults);
+    faultTextAppendPm100(faults, pm100PostFaults, pm100RunFaults);
     if (faults.count == beforeCount) {
-      appendDashboardFault(faults, "Inv Fault");
+      faultTextAppend(faults, "Inv Fault");
     }
   }
 
-  if (!appsPlausible) {
-    appendDashboardFault(faults, appsFaultText);
+  if (!isAppsPlausible) {
+    faultTextAppend(faults, appsFaultText);
   }
 
-  if (bspcActive) {
-    appendDashboardFault(faults, "BSPC Zero Trq");
+  if (isBspcActive) {
+    faultTextAppend(faults, "BSPC Zero Trq");
   }
 }
 
-void appendDashboardFault(DashboardFaultList &faults, const char *text) {
+void faultTextAppend(DashboardFaultList &faults, const char *text) {
   if (faults.count >= DASHBOARD_MAX_FAULT_TEXTS || text == nullptr || text[0] == '\0') {
     return;
   }
@@ -100,35 +100,35 @@ void appendDashboardFault(DashboardFaultList &faults, const char *text) {
   faults.texts[faults.count++] = text;
 }
 
-void appendTssiFaultNames(DashboardFaultList &faults, uint16_t bits) {
-  if (bits & (1u << 0)) appendDashboardFault(faults, "DeviceError");
-  if (bits & (1u << 1)) appendDashboardFault(faults, "HV+ConnFail");
-  if (bits & (1u << 2)) appendDashboardFault(faults, "HV-ConnFail");
-  if (bits & (1u << 3)) appendDashboardFault(faults, "EarthConnFail");
-  if (bits & (1u << 4)) appendDashboardFault(faults, "IsoAlarm");
-  if (bits & (1u << 7)) appendDashboardFault(faults, "Unbalance");
-  if (bits & (1u << 8)) appendDashboardFault(faults, "Undervolt");
-  if (bits & (1u << 9)) appendDashboardFault(faults, "UnsafeStart");
-  if (bits & (1u << 10)) appendDashboardFault(faults, "EarthliftOpen");
-  if (bits & (1u << 5)) appendDashboardFault(faults, "IsoWarning");
-  if (bits & (1u << 6)) appendDashboardFault(faults, "IsoOutdated");
+void faultTextAppendTssi(DashboardFaultList &faults, uint16_t bits) {
+  if (bits & (1u << 0)) faultTextAppend(faults, "DeviceError");
+  if (bits & (1u << 1)) faultTextAppend(faults, "HV+ConnFail");
+  if (bits & (1u << 2)) faultTextAppend(faults, "HV-ConnFail");
+  if (bits & (1u << 3)) faultTextAppend(faults, "EarthConnFail");
+  if (bits & (1u << 4)) faultTextAppend(faults, "IsoAlarm");
+  if (bits & (1u << 7)) faultTextAppend(faults, "Unbalance");
+  if (bits & (1u << 8)) faultTextAppend(faults, "Undervolt");
+  if (bits & (1u << 9)) faultTextAppend(faults, "UnsafeStart");
+  if (bits & (1u << 10)) faultTextAppend(faults, "EarthliftOpen");
+  if (bits & (1u << 5)) faultTextAppend(faults, "IsoWarning");
+  if (bits & (1u << 6)) faultTextAppend(faults, "IsoOutdated");
 }
 
-void appendPm100FaultNames(DashboardFaultList &faults, uint32_t postFaults, uint32_t runFaults) {
+void faultTextAppendPm100(DashboardFaultList &faults, uint32_t postFaults, uint32_t runFaults) {
   for (uint8_t bit = 0; bit < 32; bit++) {
     if (postFaults & (1UL << bit)) {
-      appendDashboardFault(faults, pm100PostFaultName(bit));
+      faultTextAppend(faults, faultTextGetPm100Post(bit));
     }
   }
 
   for (uint8_t bit = 0; bit < 32; bit++) {
     if (runFaults & (1UL << bit)) {
-      appendDashboardFault(faults, pm100RunFaultName(bit));
+      faultTextAppend(faults, faultTextGetPm100Run(bit));
     }
   }
 }
 
-const char *firstTssiFaultName(uint16_t bits) {
+const char *faultTextGetFirstTssi(uint16_t bits) {
   if (bits & (1u << 0)) return "DeviceError";
   if (bits & (1u << 1)) return "HV+ConnFail";
   if (bits & (1u << 2)) return "HV-ConnFail";
@@ -143,17 +143,17 @@ const char *firstTssiFaultName(uint16_t bits) {
   return "Fault";
 }
 
-const char *firstPm100FaultName(uint32_t postFaults, uint32_t runFaults) {
+const char *faultTextGetFirstPm100(uint32_t postFaults, uint32_t runFaults) {
   for (uint8_t bit = 0; bit < 32; bit++) {
-    if (postFaults & (1UL << bit)) return pm100PostFaultName(bit);
+    if (postFaults & (1UL << bit)) return faultTextGetPm100Post(bit);
   }
   for (uint8_t bit = 0; bit < 32; bit++) {
-    if (runFaults & (1UL << bit)) return pm100RunFaultName(bit);
+    if (runFaults & (1UL << bit)) return faultTextGetPm100Run(bit);
   }
   return "No Fault";
 }
 
-const char *bmsTemperatureFaultCodeName(uint8_t faultCode) {
+const char *faultTextGetBmsTemperatureCode(uint8_t faultCode) {
   switch (faultCode) {
     case 0:  return "No Fault";
     case 1:  return "Cell UV";
@@ -172,7 +172,7 @@ const char *bmsTemperatureFaultCodeName(uint8_t faultCode) {
   }
 }
 
-const char *pm100PostFaultName(uint8_t bit) {
+const char *faultTextGetPm100Post(uint8_t bit) {
   switch (bit) {
     case 0: return "POST GateDesat";
     case 1: return "POST OverCur";
@@ -210,7 +210,7 @@ const char *pm100PostFaultName(uint8_t bit) {
   }
 }
 
-const char *pm100RunFaultName(uint8_t bit) {
+const char *faultTextGetPm100Run(uint8_t bit) {
   switch (bit) {
     case 0: return "Mtr Overspeed";
     case 1: return "Inv Overcur";

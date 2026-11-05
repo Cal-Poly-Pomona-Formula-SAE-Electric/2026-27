@@ -16,7 +16,7 @@
 #include "can_trace_imd.h"
 #include "fault_text.h"
 
-static constexpr bool CAN_TRANSLATION_SERIAL_ENABLED = true;
+static constexpr bool IS_CAN_TRANSLATION_SERIAL_ENABLED = true;
 
 static constexpr uint8_t CELL_DATA_REQUEST_UNKNOWN      = 0x00;
 
@@ -28,7 +28,7 @@ static constexpr uint32_t IMD_FALLBACK_REQUEST_ID = 0x0FF;
 
 uint8_t lastCellDataRequestType = CELL_DATA_REQUEST_UNKNOWN;
 
-typedef void (*CanTranslationPrinter)(const CAN_message_t &msg);
+typedef void (*CanTranslationPrinter)(const CAN_message_t &frame);
 
 struct CanFrameTranslation {
   uint32_t id;
@@ -36,68 +36,68 @@ struct CanFrameTranslation {
   CanTranslationPrinter print;
 };
 
-void printBmsStatus2026Translation(const CAN_message_t &msg);
-void printBmsTemperature2026Translation(const CAN_message_t &msg);
-void printCellDataRequest2026Translation(const CAN_message_t &msg);
-void printCellDataResponse2026Translation(const CAN_message_t &msg);
-void printPm100CommandTranslation(const CAN_message_t &msg);
-void printPm100Temperatures1Translation(const CAN_message_t &msg);
-void printPm100Temperatures3Translation(const CAN_message_t &msg);
-void printPm100MotorPositionTranslation(const CAN_message_t &msg);
-void printPm100CurrentInfoTranslation(const CAN_message_t &msg);
-void printPm100VoltageInfoTranslation(const CAN_message_t &msg);
-void printPm100InternalVoltagesTranslation(const CAN_message_t &msg);
-void printPm100FaultCodesTranslation(const CAN_message_t &msg);
-void printPm100TorqueCapabilityTranslation(const CAN_message_t &msg);
-void printBmsTemperatureFaultCode(uint8_t faultCode);
-void printCellDataRequestName(uint8_t requestType);
-void printCellVoltageValue(uint16_t millivolts);
+void tracePrintBmsStatus2026(const CAN_message_t &frame);
+void tracePrintBmsTemperature2026(const CAN_message_t &frame);
+void tracePrintCellDataRequest2026(const CAN_message_t &frame);
+void tracePrintCellDataResponse2026(const CAN_message_t &frame);
+void tracePrintPm100Command(const CAN_message_t &frame);
+void tracePrintPm100Temperatures1(const CAN_message_t &frame);
+void tracePrintPm100Temperatures3(const CAN_message_t &frame);
+void tracePrintPm100MotorPosition(const CAN_message_t &frame);
+void tracePrintPm100CurrentInfo(const CAN_message_t &frame);
+void tracePrintPm100VoltageInfo(const CAN_message_t &frame);
+void tracePrintPm100InternalVoltages(const CAN_message_t &frame);
+void tracePrintPm100FaultCodes(const CAN_message_t &frame);
+void tracePrintPm100TorqueCapability(const CAN_message_t &frame);
+void tracePrintBmsTemperatureFaultCode(uint8_t faultCode);
+void tracePrintCellDataRequestName(uint8_t requestType);
+void tracePrintCellVoltageValue(uint16_t millivolts);
 
 static const CanFrameTranslation CAN_FRAME_TRANSLATIONS[] = {
-  {BMS_STATUS_2026_ID,        "BMS Status",        printBmsStatus2026Translation},
-  {BMS_TEMPERATURE_2026_ID,   "BMS Temperature",   printBmsTemperature2026Translation},
-  {BMS_CELL_REQUEST_2026_ID,  "Cell Data Request", printCellDataRequest2026Translation},
-  {BMS_CELL_RESPONSE_2026_ID, "Cell Data Response", printCellDataResponse2026Translation},
-  {IMD_REQUEST_ID, "IMD Request", printImdRequestTranslation},
-  {IMD_FALLBACK_REQUEST_ID, "IMD Fallback Request", printImdRequestTranslation},
-  {IMD_RESPONSE_ID, "IMD Response", printImdResponseTranslation},
-  {IMD_INFO_GENERAL_ID, "IMD Info General", printImdInfoGeneralTranslation},
-  {IMD_INFO_ISOLATION_DETAIL_ID, "IMD Info Isolation Detail", printImdInfoIsolationDetailTranslation},
-  {IMD_INFO_VOLTAGE_ID, "IMD Info Voltage", printImdInfoVoltageTranslation},
-  {IMD_INFO_IT_SYSTEM_ID, "IMD Info IT-System", printImdInfoItSystemTranslation},
-  {PM100_CMD_ID, "PM100 Command", printPm100CommandTranslation},
-  {PM100_TEMPERATURE_1_FRAME_ID, "PM100 Temperatures #1", printPm100Temperatures1Translation},
-  {PM100_TEMPERATURE_3_FRAME_ID, "PM100 Temperatures #3", printPm100Temperatures3Translation},
-  {PM100_RPM_FRAME_ID, "PM100 Motor Position", printPm100MotorPositionTranslation},
-  {PM100_CURRENT_INFO_FRAME_ID, "PM100 Current Information", printPm100CurrentInfoTranslation},
-  {PM100_VOLTAGE_INFO_FRAME_ID, "PM100 Voltage Information", printPm100VoltageInfoTranslation},
-  {PM100_INTERNAL_VOLTAGES_FRAME_ID, "PM100 Internal Voltages", printPm100InternalVoltagesTranslation},
-  {PM100_FAULT_CODES_FRAME_ID, "PM100 Fault Codes", printPm100FaultCodesTranslation},
-  {PM100_TORQUE_CAPABILITY_FRAME_ID, "PM100 Torque Capability", printPm100TorqueCapabilityTranslation}
+  {BMS_STATUS_2026_ID,        "BMS Status",        tracePrintBmsStatus2026},
+  {BMS_TEMPERATURE_2026_ID,   "BMS Temperature",   tracePrintBmsTemperature2026},
+  {BMS_CELL_REQUEST_2026_ID,  "Cell Data Request", tracePrintCellDataRequest2026},
+  {BMS_CELL_RESPONSE_2026_ID, "Cell Data Response", tracePrintCellDataResponse2026},
+  {IMD_REQUEST_ID, "IMD Request", tracePrintImdRequest},
+  {IMD_FALLBACK_REQUEST_ID, "IMD Fallback Request", tracePrintImdRequest},
+  {IMD_RESPONSE_ID, "IMD Response", tracePrintImdResponse},
+  {IMD_INFO_GENERAL_ID, "IMD Info General", tracePrintImdInfoGeneral},
+  {IMD_INFO_ISOLATION_DETAIL_ID, "IMD Info Isolation Detail", tracePrintImdInfoIsolationDetail},
+  {IMD_INFO_VOLTAGE_ID, "IMD Info Voltage", tracePrintImdInfoVoltage},
+  {IMD_INFO_IT_SYSTEM_ID, "IMD Info IT-System", tracePrintImdInfoItSystem},
+  {PM100_CMD_ID, "PM100 Command", tracePrintPm100Command},
+  {PM100_TEMPERATURE_1_FRAME_ID, "PM100 Temperatures #1", tracePrintPm100Temperatures1},
+  {PM100_TEMPERATURE_3_FRAME_ID, "PM100 Temperatures #3", tracePrintPm100Temperatures3},
+  {PM100_RPM_FRAME_ID, "PM100 Motor Position", tracePrintPm100MotorPosition},
+  {PM100_CURRENT_INFO_FRAME_ID, "PM100 Current Information", tracePrintPm100CurrentInfo},
+  {PM100_VOLTAGE_INFO_FRAME_ID, "PM100 Voltage Information", tracePrintPm100VoltageInfo},
+  {PM100_INTERNAL_VOLTAGES_FRAME_ID, "PM100 Internal Voltages", tracePrintPm100InternalVoltages},
+  {PM100_FAULT_CODES_FRAME_ID, "PM100 Fault Codes", tracePrintPm100FaultCodes},
+  {PM100_TORQUE_CAPABILITY_FRAME_ID, "PM100 Torque Capability", tracePrintPm100TorqueCapability}
 };
 
 static constexpr uint8_t CAN_FRAME_TRANSLATION_COUNT =
     sizeof(CAN_FRAME_TRANSLATIONS) / sizeof(CAN_FRAME_TRANSLATIONS[0]);
 
 // ---------------- CAN decoded logging ----------------
-void updateCanTranslationState(const char *direction, const CAN_message_t &msg) {
+void traceUpdateState(const char *direction, const CAN_message_t &frame) {
   (void)direction;
 
-  if (msg.flags.extended || msg.id != BMS_CELL_REQUEST_2026_ID || msg.len < 1) {
+  if (frame.flags.extended || frame.id != BMS_CELL_REQUEST_2026_ID || frame.len < 1) {
     return;
   }
 
-  lastCellDataRequestType = msg.buf[0];
+  lastCellDataRequestType = frame.buf[0];
 }
 
-void logCanTranslationToSerial(const char *direction, const CAN_message_t &msg) {
-  if (!CAN_TRANSLATION_SERIAL_ENABLED) {
+void traceLogToSerial(const char *direction, const CAN_message_t &frame) {
+  if (!IS_CAN_TRANSLATION_SERIAL_ENABLED) {
     return;
   }
 
   for (uint8_t i = 0; i < CAN_FRAME_TRANSLATION_COUNT; i++) {
     const CanFrameTranslation &translation = CAN_FRAME_TRANSLATIONS[i];
-    if (msg.id != translation.id) {
+    if (frame.id != translation.id) {
       continue;
     }
 
@@ -106,25 +106,25 @@ void logCanTranslationToSerial(const char *direction, const CAN_message_t &msg) 
     Serial.print(" DECODED] ");
     Serial.print(translation.name);
     Serial.print(": ");
-    translation.print(msg);
+    translation.print(frame);
     Serial.println();
     return;
   }
 }
 
-void printBmsStatus2026Translation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintBmsStatus2026(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  uint8_t flags = msg.buf[0];
-  uint16_t minCellMv = u16Be(msg.buf[1], msg.buf[2]);
-  uint16_t maxCellMv = u16Be(msg.buf[3], msg.buf[4]);
-  uint16_t avgCellMv = u16Be(msg.buf[5], msg.buf[6]);
+  uint8_t flags = frame.buf[0];
+  uint16_t minCellMv = canReadU16Be(frame.buf[1], frame.buf[2]);
+  uint16_t maxCellMv = canReadU16Be(frame.buf[3], frame.buf[4]);
+  uint16_t avgCellMv = canReadU16Be(frame.buf[5], frame.buf[6]);
 
   Serial.print("flags=0x");
-  printCanHexByte(flags);
+  tracePrintCanHexByte(flags);
   Serial.print(" fault=");
   Serial.print((flags & (1u << 0)) ? "YES" : "NO");
   Serial.print(" posContactorClosed=");
@@ -138,68 +138,68 @@ void printBmsStatus2026Translation(const CAN_message_t &msg) {
   Serial.print("mV avgCell=");
   Serial.print(avgCellMv);
   Serial.print("mV soc=");
-  if (msg.buf[7] == 0xFF) {
+  if (frame.buf[7] == 0xFF) {
     Serial.print("unknown");
   } else {
-    Serial.print(msg.buf[7]);
+    Serial.print(frame.buf[7]);
     Serial.print('%');
   }
 }
 
-void printBmsTemperature2026Translation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintBmsTemperature2026(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  uint8_t faultCode = msg.buf[3];
-  uint16_t packCurrentRaw = u16Be(msg.buf[4], msg.buf[5]);
+  uint8_t faultCode = frame.buf[3];
+  uint16_t packCurrentRaw = canReadU16Be(frame.buf[4], frame.buf[5]);
   float packCurrentA = ((int32_t)packCurrentRaw - 3000) * 0.1f;
 
   Serial.print("minCellTemp=");
-  Serial.print((int)msg.buf[0] - 40);
+  Serial.print((int)frame.buf[0] - 40);
   Serial.print("C maxCellTemp=");
-  Serial.print((int)msg.buf[1] - 40);
+  Serial.print((int)frame.buf[1] - 40);
   Serial.print("C avgCellTemp=");
-  Serial.print((int)msg.buf[2] - 40);
+  Serial.print((int)frame.buf[2] - 40);
   Serial.print("C faultCode=");
   Serial.print(faultCode);
   Serial.print('(');
-  printBmsTemperatureFaultCode(faultCode);
+  tracePrintBmsTemperatureFaultCode(faultCode);
   Serial.print(") packCurrent=");
   Serial.print(packCurrentA, 1);
   Serial.print("A reserved=");
-  printCanHexByte(msg.buf[6]);
+  tracePrintCanHexByte(frame.buf[6]);
   Serial.print(' ');
-  printCanHexByte(msg.buf[7]);
+  tracePrintCanHexByte(frame.buf[7]);
 }
 
-void printCellDataRequest2026Translation(const CAN_message_t &msg) {
-  if (msg.len < 1) {
+void tracePrintCellDataRequest2026(const CAN_message_t &frame) {
+  if (frame.len < 1) {
     Serial.print("short frame, expected request byte");
     return;
   }
 
   Serial.print("request=0x");
-  printCanHexByte(msg.buf[0]);
+  tracePrintCanHexByte(frame.buf[0]);
   Serial.print(" (");
-  printCellDataRequestName(msg.buf[0]);
+  tracePrintCellDataRequestName(frame.buf[0]);
   Serial.print(')');
 }
 
-void printCellDataResponse2026Translation(const CAN_message_t &msg) {
-  if (msg.len < 1) {
+void tracePrintCellDataResponse2026(const CAN_message_t &frame) {
+  if (frame.len < 1) {
     Serial.print("short frame, expected frame index");
     return;
   }
 
-  uint8_t frameIndex = msg.buf[0];
+  uint8_t frameIndex = frame.buf[0];
 
   Serial.print("frameIndex=");
   Serial.print(frameIndex);
 
   if (lastCellDataRequestType == CELL_DATA_REQUEST_VOLTAGES) {
-    uint8_t availablePairs = (msg.len > 1) ? ((msg.len - 1) / 2) : 0;
+    uint8_t availablePairs = (frame.len > 1) ? ((frame.len - 1) / 2) : 0;
     if (availablePairs > 3) {
       availablePairs = 3;
     }
@@ -212,17 +212,17 @@ void printCellDataResponse2026Translation(const CAN_message_t &msg) {
       Serial.print('#');
       Serial.print((uint16_t)frameIndex * 3u + i + 1u);
       Serial.print('=');
-      printCellVoltageValue(u16Be(msg.buf[1 + (i * 2)], msg.buf[2 + (i * 2)]));
+      tracePrintCellVoltageValue(canReadU16Be(frame.buf[1 + (i * 2)], frame.buf[2 + (i * 2)]));
     }
     if (availablePairs == 0) {
       Serial.print("none");
     }
-    if (msg.len > 7) {
+    if (frame.len > 7) {
       Serial.print(" extra=");
-      printCanHexByte(msg.buf[7]);
+      tracePrintCanHexByte(frame.buf[7]);
     }
   } else if (lastCellDataRequestType == CELL_DATA_REQUEST_TEMPERATURES) {
-    uint8_t availableTemps = (msg.len > 1) ? (msg.len - 1) : 0;
+    uint8_t availableTemps = (frame.len > 1) ? (frame.len - 1) : 0;
     if (availableTemps > 7) {
       availableTemps = 7;
     }
@@ -235,7 +235,7 @@ void printCellDataResponse2026Translation(const CAN_message_t &msg) {
       Serial.print('#');
       Serial.print((uint16_t)frameIndex * 7u + i + 1u);
       Serial.print('=');
-      Serial.print((int)msg.buf[1 + i] - 40);
+      Serial.print((int)frame.buf[1 + i] - 40);
       Serial.print('C');
     }
     if (availableTemps == 0) {
@@ -243,31 +243,31 @@ void printCellDataResponse2026Translation(const CAN_message_t &msg) {
     }
   } else {
     Serial.print(" mode=unknown lastRequest=0x");
-    printCanHexByte(lastCellDataRequestType);
+    tracePrintCanHexByte(lastCellDataRequestType);
     Serial.print(" payload=");
-    printRawPayloadFrom(msg, 1);
+    tracePrintRawPayloadFrom(frame, 1);
   }
 }
 
-void printPm100CommandTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100Command(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t torqueRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t speedCommandRpm = s16Le(msg.buf[2], msg.buf[3]);
-  uint8_t directionCommand = msg.buf[4];
-  uint8_t inverterEnable = msg.buf[5];
-  uint8_t inverterDischarge = msg.buf[6];
-  uint8_t speedModeEnable = msg.buf[7];
+  int16_t torqueRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t speedCommandRpm = canReadS16Le(frame.buf[2], frame.buf[3]);
+  uint8_t directionCommand = frame.buf[4];
+  uint8_t inverterEnable = frame.buf[5];
+  uint8_t inverterDischarge = frame.buf[6];
+  uint8_t speedModeEnable = frame.buf[7];
 
   Serial.print("torqueCommand=");
   Serial.print((float)torqueRaw / 10.0f, 1);
   Serial.print("Nm speedCommand=");
   Serial.print(speedCommandRpm);
   Serial.print("rpm direction=0x");
-  printCanHexByte(directionCommand);
+  tracePrintCanHexByte(directionCommand);
   Serial.print('(');
   if (directionCommand == 0x00) {
     Serial.print("reverse/clockwise");
@@ -279,23 +279,23 @@ void printPm100CommandTranslation(const CAN_message_t &msg) {
   Serial.print(") inverterEnable=");
   Serial.print(inverterEnable ? "ON" : "OFF");
   Serial.print(" inverterEnableRaw=0x");
-  printCanHexByte(inverterEnable);
+  tracePrintCanHexByte(inverterEnable);
   Serial.print(" inverterDischarge=0x");
-  printCanHexByte(inverterDischarge);
+  tracePrintCanHexByte(inverterDischarge);
   Serial.print(" speedModeEnable=0x");
-  printCanHexByte(speedModeEnable);
+  tracePrintCanHexByte(speedModeEnable);
 }
 
-void printPm100Temperatures1Translation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100Temperatures1(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t moduleATempRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t moduleBTempRaw = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t moduleCTempRaw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t gateDriverTempRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t moduleATempRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t moduleBTempRaw = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t moduleCTempRaw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t gateDriverTempRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   Serial.print("moduleA=");
   Serial.print((float)moduleATempRaw / 10.0f, 1);
@@ -308,16 +308,16 @@ void printPm100Temperatures1Translation(const CAN_message_t &msg) {
   Serial.print("C");
 }
 
-void printPm100Temperatures3Translation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100Temperatures3(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t coolantTempRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t hotSpotTempRaw = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t motorTempRaw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t torqueShudderRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t coolantTempRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t hotSpotTempRaw = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t motorTempRaw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t torqueShudderRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   Serial.print("coolant=");
   Serial.print((float)coolantTempRaw / 10.0f, 1);
@@ -330,16 +330,16 @@ void printPm100Temperatures3Translation(const CAN_message_t &msg) {
   Serial.print("Nm");
 }
 
-void printPm100MotorPositionTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100MotorPosition(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t motorAngleRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t motorSpeedRpm = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t electricalFrequencyRaw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t deltaResolverRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t motorAngleRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t motorSpeedRpm = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t electricalFrequencyRaw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t deltaResolverRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   Serial.print("motorAngle=");
   Serial.print((float)motorAngleRaw / 10.0f, 1);
@@ -352,16 +352,16 @@ void printPm100MotorPositionTranslation(const CAN_message_t &msg) {
   Serial.print("deg");
 }
 
-void printPm100CurrentInfoTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100CurrentInfo(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t phaseACurrentRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t phaseBCurrentRaw = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t phaseCCurrentRaw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t dcBusCurrentRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t phaseACurrentRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t phaseBCurrentRaw = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t phaseCCurrentRaw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t dcBusCurrentRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   Serial.print("phaseA=");
   Serial.print((float)phaseACurrentRaw / 10.0f, 1);
@@ -374,16 +374,16 @@ void printPm100CurrentInfoTranslation(const CAN_message_t &msg) {
   Serial.print("A");
 }
 
-void printPm100VoltageInfoTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100VoltageInfo(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t dcBusVoltageRaw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t outputVoltageRaw = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t vabVdVoltageRaw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t vbcVqVoltageRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t dcBusVoltageRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t outputVoltageRaw = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t vabVdVoltageRaw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t vbcVqVoltageRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   Serial.print("dcBus=");
   Serial.print((float)dcBusVoltageRaw / 10.0f, 1);
@@ -396,16 +396,16 @@ void printPm100VoltageInfoTranslation(const CAN_message_t &msg) {
   Serial.print("V");
 }
 
-void printPm100InternalVoltagesTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100InternalVoltages(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  int16_t ref1V5Raw = s16Le(msg.buf[0], msg.buf[1]);
-  int16_t ref2V5Raw = s16Le(msg.buf[2], msg.buf[3]);
-  int16_t ref5V0Raw = s16Le(msg.buf[4], msg.buf[5]);
-  int16_t glvRaw = s16Le(msg.buf[6], msg.buf[7]);
+  int16_t ref1V5Raw = canReadS16Le(frame.buf[0], frame.buf[1]);
+  int16_t ref2V5Raw = canReadS16Le(frame.buf[2], frame.buf[3]);
+  int16_t ref5V0Raw = canReadS16Le(frame.buf[4], frame.buf[5]);
+  int16_t glvRaw = canReadS16Le(frame.buf[6], frame.buf[7]);
 
   Serial.print("ref1V5=");
   Serial.print((float)ref1V5Raw / 100.0f, 2);
@@ -418,14 +418,14 @@ void printPm100InternalVoltagesTranslation(const CAN_message_t &msg) {
   Serial.print("V");
 }
 
-void printPm100FaultCodesTranslation(const CAN_message_t &msg) {
-  if (msg.len < 8) {
+void tracePrintPm100FaultCodes(const CAN_message_t &frame) {
+  if (frame.len < 8) {
     Serial.print("short frame, expected 8 bytes");
     return;
   }
 
-  uint32_t postFaults = u32Le(msg.buf[0], msg.buf[1], msg.buf[2], msg.buf[3]);
-  uint32_t runFaults = u32Le(msg.buf[4], msg.buf[5], msg.buf[6], msg.buf[7]);
+  uint32_t postFaults = canReadU32Le(frame.buf[0], frame.buf[1], frame.buf[2], frame.buf[3]);
+  uint32_t runFaults = canReadU32Le(frame.buf[4], frame.buf[5], frame.buf[6], frame.buf[7]);
 
   Serial.print("post=0x");
   Serial.print((unsigned long)postFaults, HEX);
@@ -433,72 +433,72 @@ void printPm100FaultCodesTranslation(const CAN_message_t &msg) {
   Serial.print((unsigned long)runFaults, HEX);
   Serial.print(" active=");
 
-  bool printedFault = false;
+  bool hasPrintedFault = false;
   for (uint8_t bit = 0; bit < 32; bit++) {
     if (postFaults & (1UL << bit)) {
-      if (printedFault) Serial.print(',');
-      Serial.print(pm100PostFaultName(bit));
-      printedFault = true;
+      if (hasPrintedFault) Serial.print(',');
+      Serial.print(faultTextGetPm100Post(bit));
+      hasPrintedFault = true;
     }
   }
 
   for (uint8_t bit = 0; bit < 32; bit++) {
     if (runFaults & (1UL << bit)) {
-      if (printedFault) Serial.print(',');
-      Serial.print(pm100RunFaultName(bit));
-      printedFault = true;
+      if (hasPrintedFault) Serial.print(',');
+      Serial.print(faultTextGetPm100Run(bit));
+      hasPrintedFault = true;
     }
   }
 
-  if (!printedFault) {
+  if (!hasPrintedFault) {
     Serial.print("none");
   }
 }
 
-void printPm100TorqueCapabilityTranslation(const CAN_message_t &msg) {
-  if (msg.len < 2) {
+void tracePrintPm100TorqueCapability(const CAN_message_t &frame) {
+  if (frame.len < 2) {
     Serial.print("short frame, expected at least 2 bytes");
     return;
   }
 
-  int16_t positiveTorqueRaw = s16Le(msg.buf[0], msg.buf[1]);
+  int16_t positiveTorqueRaw = canReadS16Le(frame.buf[0], frame.buf[1]);
 
   Serial.print("positiveTorqueCapability=");
   Serial.print((float)positiveTorqueRaw / 10.0f, 1);
   Serial.print("Nm");
 
-  if (msg.len >= 4) {
-    int16_t negativeTorqueRaw = s16Le(msg.buf[2], msg.buf[3]);
+  if (frame.len >= 4) {
+    int16_t negativeTorqueRaw = canReadS16Le(frame.buf[2], frame.buf[3]);
     Serial.print(" possibleNegativeTorqueCapability=");
     Serial.print((float)negativeTorqueRaw / 10.0f, 1);
     Serial.print("Nm");
   }
 
-  if (msg.len > 4) {
+  if (frame.len > 4) {
     Serial.print(" reserved=");
-    printRawPayloadFrom(msg, 4);
+    tracePrintRawPayloadFrom(frame, 4);
   }
 }
 
-void printRawPayloadFrom(const CAN_message_t &msg, uint8_t startIndex) {
-  if (startIndex >= msg.len) {
+void tracePrintRawPayloadFrom(const CAN_message_t &frame, uint8_t startIndex) {
+  if (startIndex >= frame.len) {
     Serial.print("none");
     return;
   }
 
-  for (uint8_t i = startIndex; i < msg.len; i++) {
+  for (uint8_t i = startIndex; i < frame.len; i++) {
     if (i > startIndex) {
       Serial.print(' ');
     }
-    printCanHexByte(msg.buf[i]);
+    tracePrintCanHexByte(frame.buf[i]);
   }
 }
 
-void printBmsTemperatureFaultCode(uint8_t faultCode) {
-  Serial.print(bmsTemperatureFaultCodeName(faultCode));
+void tracePrintBmsTemperatureFaultCode(uint8_t faultCode) {
+  Serial.print(faultTextGetBmsTemperatureCode(faultCode));
 }
 
-void printCellDataRequestName(uint8_t requestType) {
+void tracePrintCellDataRequestName(uint8_t requestType) {
   switch (requestType) {
     case CELL_DATA_REQUEST_VOLTAGES: Serial.print("cell voltages"); break;
     case CELL_DATA_REQUEST_TEMPERATURES: Serial.print("cell temperatures"); break;
@@ -506,7 +506,7 @@ void printCellDataRequestName(uint8_t requestType) {
   }
 }
 
-void printCellVoltageValue(uint16_t millivolts) {
+void tracePrintCellVoltageValue(uint16_t millivolts) {
   if (millivolts == 0xFFFF) {
     Serial.print("pad");
   } else {
@@ -515,7 +515,7 @@ void printCellVoltageValue(uint16_t millivolts) {
   }
 }
 
-void printCanHexByte(uint8_t value) {
+void tracePrintCanHexByte(uint8_t value) {
   if (value < 0x10) {
     Serial.print('0');
   }

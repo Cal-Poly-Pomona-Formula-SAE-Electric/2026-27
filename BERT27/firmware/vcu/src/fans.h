@@ -12,13 +12,13 @@
 #include <Arduino.h>
 
 // Fan duty in percent. The serial console can set these by hand
-// (fanManualOverride = true) instead of the temperature curve.
-extern int fan1DutyPercent;
-extern int fan2DutyPercent;
-extern bool fanManualOverride;
+// (isFanManualOverride = true) instead of the temperature curve.
+extern int fan1DutyPct;
+extern int fan2DutyPct;
+extern bool isFanManualOverride;
 
-void setupFans();
-void updateFanDutyFromTemps();
-void serviceFans();
+void fansSetup();
+void fansUpdateDutyFromTemps();
+void fansService();
 
 #endif  // VCU_FANS_H

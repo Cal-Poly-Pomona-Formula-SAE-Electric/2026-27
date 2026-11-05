@@ -14,13 +14,13 @@
 static constexpr uint32_t SCREEN_PERIOD_MS = 100;
 static constexpr uint32_t DASHBOARD_FULL_REDRAW_MS = 120000;  // periodic anti-glitch repaint
 
-extern bool screenDirty;
-extern bool dashboardNeedsFullRedraw;
+extern bool isScreenDirty;
+extern bool isDashFullRedrawNeeded;
 
-void setupDisplay();
-void handleTouch();
-void drawDashboard();
-void showFaultBanner(const char *text);
-void serviceFaultBanner();
+void dashSetup();
+void dashHandleTouch();
+void dashDraw();
+void dashShowFaultBanner(const char *text);
+void dashServiceFaultBanner();
 
 #endif  // VCU_DASHBOARD_H

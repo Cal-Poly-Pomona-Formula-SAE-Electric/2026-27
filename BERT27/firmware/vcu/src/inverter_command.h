@@ -18,8 +18,8 @@ static constexpr uint32_t PM100_CMD_ID       = 0x0C0;
 extern float commandedTorqueNm;
 extern float displayedCommandTorqueNm;
 
-void setupPm100CommandTimer();
-void updatePm100CommandState();
-void servicePm100TxLogging();
+void inverterCmdSetupTimer();
+void inverterCmdUpdateState();
+void inverterCmdServiceTxLogging();
 
 #endif  // VCU_INVERTER_COMMAND_H

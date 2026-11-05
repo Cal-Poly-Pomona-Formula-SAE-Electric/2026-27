@@ -19,12 +19,12 @@
 #include "fault_text.h"
 #include "dashboard.h"
 
-bool rtdInputsReady();
-bool readyForRtdButton();
-void logRtdBlockedReason();
-void handleRtdButtonPressed();
-void setRtdState(RtdState newState);
-const char *rtdStateName(RtdState state);
+bool rtdAreInputsReady();
+bool rtdIsReadyForButton();
+void rtdLogBlockedReason();
+void rtdHandleButtonPressed();
+void rtdSetState(RtdState newState);
+const char *rtdGetStateName(RtdState state);
 
 static constexpr uint32_t RTD_BLOCKED_LOG_PERIOD_MS = 1000;
 
@@ -33,9 +33,9 @@ char driveMode = 'N';  // RTD state machine sets D only while ready to drive.
 
 RtdState rtdState = RTD_STATE_FAULT_BLOCKED;
 // Compatibility flag used by the display and PM100 gate; kept in sync with rtdState.
-bool readyToDriveLatched = false;
+bool isReadyToDriveLatched = false;
 
-bool readyButtonLast = false;
+bool wasReadyButtonPressed = false;
 
 // EV.10.2: ready-to-drive sound, 1-3 seconds. Solid continuous tone for the
 // first 1.25 s (satisfies the >=1 s continuous requirement), then a short
@@ -49,158 +49,158 @@ static const ToneStep RTD_PATTERN[] = {
 };
 
 // ---------------- Ready to drive state machine ----------------
-void serviceReadyToDrive() {
-  refreshRtdStateFromInputs();
+void rtdService() {
+  rtdRefreshStateFromInputs();
 
-  bool pressed = readReadyButtonPressed();
+  bool isPressed = rtdReadButtonPressed();
 
-  if (pressed && !readyButtonLast) {
-    handleRtdButtonPressed();
-    screenDirty = true;
+  if (isPressed && !wasReadyButtonPressed) {
+    rtdHandleButtonPressed();
+    isScreenDirty = true;
   }
 
-  readyButtonLast = pressed;
+  wasReadyButtonPressed = isPressed;
 }
 
-bool readReadyButtonPressed() {
-  return digitalRead(READY_BUTTON_PIN) == HIGH;
+bool rtdReadButtonPressed() {
+  return digitalRead(PIN_READY_BUTTON) == HIGH;
 }
 
-bool rtdInputsReady() {
-  if (!bmsImdFaultDetectionArmed()) {
+bool rtdAreInputsReady() {
+  if (!faultsIsBmsImdDetectionArmed()) {
     return false;
   }
 
   // APPS implausibility intentionally does not gate RTD; it zeroes the torque
-  // command instead (see updatePedal/updatePm100CommandState).
-  return !anyFaultActive() && !contactorsOpen();
+  // command instead (see pedalsUpdate/inverterCmdUpdateState).
+  return !faultsIsAnyActive() && !bmsAreContactorsOpen();
 }
 
-bool readyForRtdButton() {
+bool rtdIsReadyForButton() {
   return rtdState == RTD_STATE_READY_FOR_BUTTON;
 }
 
-void refreshRtdStateFromInputs() {
+void rtdRefreshStateFromInputs() {
   if (rtdState == RTD_STATE_READY_TO_DRIVE) {
-    if (!rtdInputsReady()) {
-      dropReadyToDrive(rtdDropCauseText());
+    if (!rtdAreInputsReady()) {
+      rtdDrop(rtdGetDropCauseText());
     }
     return;
   }
 
-  bool inputsReady = rtdInputsReady();
-  if (!inputsReady) {
-    logRtdBlockedReason();
+  bool areInputsReady = rtdAreInputsReady();
+  if (!areInputsReady) {
+    rtdLogBlockedReason();
   }
 
-  setRtdState(inputsReady ? RTD_STATE_READY_FOR_BUTTON : RTD_STATE_FAULT_BLOCKED);
+  rtdSetState(areInputsReady ? RTD_STATE_READY_FOR_BUTTON : RTD_STATE_FAULT_BLOCKED);
 }
 
 // Periodically prints why RTD_STATE_FAULT_BLOCKED hasn't cleared, e.g. so a
 // stuck contactor/fault/IMD flag after an HV power cycle shows up in the
 // serial log instead of just leaving the dashboard stuck on "N".
-void logRtdBlockedReason() {
+void rtdLogBlockedReason() {
   static uint32_t lastLogMs = 0;
-  uint32_t now = millis();
-  if (now - lastLogMs < RTD_BLOCKED_LOG_PERIOD_MS) {
+  uint32_t nowMs = millis();
+  if (nowMs - lastLogMs < RTD_BLOCKED_LOG_PERIOD_MS) {
     return;
   }
-  lastLogMs = now;
+  lastLogMs = nowMs;
 
-  if (!bmsImdFaultDetectionArmed()) {
+  if (!faultsIsBmsImdDetectionArmed()) {
     Serial.println("[RTD] Blocked: startup fault-detection delay active");
     return;
   }
 
   Serial.print("[RTD] Blocked:");
-  if (imdFault)            Serial.print(" imdFault");
-  if (bmsFault)            Serial.print(" bmsFault");
-  if (contactorsOpen())    Serial.print(" contactorsOpen");
-  if (imdCanTimedOut)      Serial.print(" imdCanTimedOut");
-  if (bmsTimedOut)         Serial.print(" bmsTimedOut");
+  if (hasImdFault)            Serial.print(" imdFault");
+  if (hasBmsFault)            Serial.print(" bmsFault");
+  if (bmsAreContactorsOpen())    Serial.print(" contactorsOpen");
+  if (isImdCanTimedOut)      Serial.print(" imdCanTimedOut");
+  if (isBmsTimedOut)         Serial.print(" bmsTimedOut");
   Serial.print(" bmsFlags=0x");
-  printCanHexByte(bmsFlags);
+  tracePrintCanHexByte(bmsFlags);
   Serial.print(" imdWarnAlarms=0x");
   Serial.print(imdWarnAlarms, HEX);
   Serial.println();
 }
 
-void handleRtdButtonPressed() {
+void rtdHandleButtonPressed() {
   Serial.print("[RTD] Button pressed, state=");
-  Serial.println(rtdStateName(rtdState));
+  Serial.println(rtdGetStateName(rtdState));
 
   switch (rtdState) {
     case RTD_STATE_READY_FOR_BUTTON:
-      if (REQUIRE_BRAKE_FOR_RTD && !braking) {
+      if (IS_BRAKE_REQUIRED_FOR_RTD && !isBraking) {
         Serial.println("[RTD] Not latched; brake pedal must be pressed");
         break;
       }
-      setRtdState(RTD_STATE_READY_TO_DRIVE);
-      playTonePattern(RTD_PATTERN, sizeof(RTD_PATTERN) / sizeof(RTD_PATTERN[0]), false);
+      rtdSetState(RTD_STATE_READY_TO_DRIVE);
+      buzzerPlayPattern(RTD_PATTERN, sizeof(RTD_PATTERN) / sizeof(RTD_PATTERN[0]), false);
       Serial.println("[RTD] Ready to drive latched");
       break;
 
     case RTD_STATE_READY_TO_DRIVE:
-      dropReadyToDrive("RTD button pressed");
+      rtdDrop("RTD button pressed");
       break;
 
     case RTD_STATE_FAULT_BLOCKED:
     default:
-      setRtdState(RTD_STATE_FAULT_BLOCKED);
-      Serial.println(anyFaultActive() ? "[RTD] Not latched; anyFault is active"
+      rtdSetState(RTD_STATE_FAULT_BLOCKED);
+      Serial.println(faultsIsAnyActive() ? "[RTD] Not latched; anyFault is active"
                                        : "[RTD] Not latched; contactors open");
       break;
   }
 }
 
-void setRtdState(RtdState newState) {
+void rtdSetState(RtdState newState) {
   char newDriveMode = (newState == RTD_STATE_READY_TO_DRIVE) ? 'D' : 'N';
 
   if (rtdState == newState) {
-    readyToDriveLatched = (newState == RTD_STATE_READY_TO_DRIVE);
+    isReadyToDriveLatched = (newState == RTD_STATE_READY_TO_DRIVE);
     if (driveMode != newDriveMode) {
-      setDriveMode(newDriveMode);
-      screenDirty = true;
+      rtdSetDriveMode(newDriveMode);
+      isScreenDirty = true;
     }
     return;
   }
 
   rtdState = newState;
-  readyToDriveLatched = (newState == RTD_STATE_READY_TO_DRIVE);
-  setDriveMode(newDriveMode);
-  screenDirty = true;
+  isReadyToDriveLatched = (newState == RTD_STATE_READY_TO_DRIVE);
+  rtdSetDriveMode(newDriveMode);
+  isScreenDirty = true;
 }
 
-void dropReadyToDrive(const char *reason) {
-  bool wasLatched = (rtdState == RTD_STATE_READY_TO_DRIVE) || readyToDriveLatched;
+void rtdDrop(const char *reason) {
+  bool wasLatched = (rtdState == RTD_STATE_READY_TO_DRIVE) || isReadyToDriveLatched;
 
-  setRtdState(rtdInputsReady() ? RTD_STATE_READY_FOR_BUTTON : RTD_STATE_FAULT_BLOCKED);
+  rtdSetState(rtdAreInputsReady() ? RTD_STATE_READY_FOR_BUTTON : RTD_STATE_FAULT_BLOCKED);
 
   if (wasLatched && reason != nullptr) {
     Serial.print("[RTD] Dropped; ");
     Serial.println(reason);
     if (strcmp(reason, "RTD button pressed") != 0) {
-      showFaultBanner(reason);
+      dashShowFaultBanner(reason);
     }
   }
 }
 
 // Names the specific condition currently blocking RTD, for serial logs and
 // the dashboard fault banner.
-const char *rtdDropCauseText() {
-  if (bmsTimedOut && haveBmsStatus) return "BMS Timeout";
-  if (imdCanTimedOut) return "IMD Timeout";
-  if (bmsFault) {
-    return (haveBms2026FaultCode && bms2026FaultCode != 0)
-               ? bmsTemperatureFaultCodeName(bms2026FaultCode)
+const char *rtdGetDropCauseText() {
+  if (isBmsTimedOut && hasBmsStatus) return "BMS Timeout";
+  if (isImdCanTimedOut) return "IMD Timeout";
+  if (hasBmsFault) {
+    return (hasBms2026FaultCode && bms2026FaultCode != 0)
+               ? faultTextGetBmsTemperatureCode(bms2026FaultCode)
                : "BMS Fault";
   }
-  if (imdFault) return firstTssiFaultName(imdWarnAlarms);
-  if (contactorsOpen()) return "Contactors Open";
+  if (hasImdFault) return faultTextGetFirstTssi(imdWarnAlarms);
+  if (bmsAreContactorsOpen()) return "Contactors Open";
   return "Fault";
 }
 
-const char *rtdStateName(RtdState state) {
+const char *rtdGetStateName(RtdState state) {
   switch (state) {
     case RTD_STATE_FAULT_BLOCKED:
       return "FAULT_BLOCKED";
@@ -213,7 +213,7 @@ const char *rtdStateName(RtdState state) {
   }
 }
 
-void setDriveMode(char newDriveMode) {
+void rtdSetDriveMode(char newDriveMode) {
   if (newDriveMode != 'D' && newDriveMode != 'N') {
     return;
   }
@@ -223,5 +223,5 @@ void setDriveMode(char newDriveMode) {
   }
 
   driveMode = newDriveMode;
-  screenDirty = true;
+  isScreenDirty = true;
 }

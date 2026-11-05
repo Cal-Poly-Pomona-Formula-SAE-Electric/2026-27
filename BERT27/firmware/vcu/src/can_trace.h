@@ -17,9 +17,9 @@ static constexpr uint8_t CELL_DATA_REQUEST_VOLTAGES     = 0x01;
 
 extern uint8_t lastCellDataRequestType;
 
-void updateCanTranslationState(const char *direction, const CAN_message_t &msg);
-void logCanTranslationToSerial(const char *direction, const CAN_message_t &msg);
-void printRawPayloadFrom(const CAN_message_t &msg, uint8_t startIndex);
-void printCanHexByte(uint8_t value);
+void traceUpdateState(const char *direction, const CAN_message_t &frame);
+void traceLogToSerial(const char *direction, const CAN_message_t &frame);
+void tracePrintRawPayloadFrom(const CAN_message_t &frame, uint8_t startIndex);
+void tracePrintCanHexByte(uint8_t value);
 
 #endif  // VCU_CAN_TRACE_H

@@ -34,9 +34,9 @@ struct RegenVoltageSampleWindow {
   uint8_t head;
 };
 
-bool regenVoltageWindowMaximums(uint32_t nowMs, float &maxTerminalV,
-                                float &maxEstimatedOpenCircuitV);
-float regenCellChargeCurrentLimitA(uint32_t nowMs);
+bool regenFindVoltageWindowMaximums(uint32_t nowMs, float &maxTerminalV,
+                                    float &maxEstimatedOpenCircuitV);
+float regenCalcCellChargeCurrentLimitA(uint32_t nowMs);
 
 static RegenVoltageSampleWindow regenVoltageWindow = {};
 static uint32_t lastRegenVoltageSampleMs = 0;
@@ -46,14 +46,14 @@ float regenTorqueNm = 0.0f;
 // Store one voltage/current pair for the regen charge-current model. This is
 // called only when the two back-to-back BMS frames arrived close enough to be
 // treated as one measurement.
-bool pushRegenVoltageSample(uint32_t nowMs) {
+bool regenPushVoltageSample(uint32_t nowMs) {
   // Reject missing/corrupt BMS voltage statistics. The normal operating range
   // is narrower, but these bounds avoid hiding a genuine high-cell condition.
-  if (!haveCellVoltageStats || !haveBmsCurrent ||
+  if (!hasCellVoltageStats || !hasBmsCurrent ||
       minCellVoltageMv < 1000 || maxCellVoltageMv > 5000 ||
       minCellVoltageMv > avgCellVoltageMv ||
       avgCellVoltageMv > maxCellVoltageMv ||
-      fabsf(packCurrent) > REGEN_PACK_CURRENT_SENSOR_MAX_A) {
+      fabsf(packCurrentA) > REGEN_PACK_CURRENT_SENSOR_MAX_A) {
     return false;
   }
 
@@ -61,7 +61,7 @@ bool pushRegenVoltageSample(uint32_t nowMs) {
   // BMS convention: positive pack current is discharge, negative is charge.
   // Vterminal = Voc - Ipack*R, therefore Voc = Vterminal + Ipack*R.
   float estimatedOpenCircuitV = terminalV +
-      packCurrent * REGEN_CELL_BANK_RESISTANCE_OHM;
+      packCurrentA * REGEN_CELL_BANK_RESISTANCE_OHM;
   if (estimatedOpenCircuitV < 0.0f || estimatedOpenCircuitV > 5.0f) {
     return false;
   }
@@ -82,9 +82,9 @@ bool pushRegenVoltageSample(uint32_t nowMs) {
 // Return the worst terminal and current-corrected maximum-cell voltages still
 // inside the 10-second window. Timestamp subtraction remains valid through the
 // millis() rollover because all intervals are much shorter than 2^31 ms.
-bool regenVoltageWindowMaximums(uint32_t nowMs, float &maxTerminalV,
-                                float &maxEstimatedOpenCircuitV) {
-  bool found = false;
+bool regenFindVoltageWindowMaximums(uint32_t nowMs, float &maxTerminalV,
+                                    float &maxEstimatedOpenCircuitV) {
+  bool isFound = false;
   for (uint8_t i = 0; i < regenVoltageWindow.count; i++) {
     if ((uint32_t)(nowMs - regenVoltageWindow.timestampMs[i]) >
         REGEN_VOLTAGE_WINDOW_MS) {
@@ -94,21 +94,21 @@ bool regenVoltageWindowMaximums(uint32_t nowMs, float &maxTerminalV,
     float terminalV = regenVoltageWindow.terminalV[i];
     float estimatedOpenCircuitV =
         regenVoltageWindow.estimatedOpenCircuitV[i];
-    if (!found || terminalV > maxTerminalV) maxTerminalV = terminalV;
-    if (!found || estimatedOpenCircuitV > maxEstimatedOpenCircuitV) {
+    if (!isFound || terminalV > maxTerminalV) maxTerminalV = terminalV;
+    if (!isFound || estimatedOpenCircuitV > maxEstimatedOpenCircuitV) {
       maxEstimatedOpenCircuitV = estimatedOpenCircuitV;
     }
-    found = true;
+    isFound = true;
   }
-  return found;
+  return isFound;
 }
 
 // Absolute allowed charge-current magnitude from the most conservative
 // current-corrected cell voltage observed in the last 10 seconds. A recent
 // terminal-voltage hit at the 4.180 V stop holds regen at zero for the same
 // window, providing hysteresis below the BMS's 4.200 V hard cutoff.
-float regenCellChargeCurrentLimitA(uint32_t nowMs) {
-  if (!regenBmsPairValid || !haveBmsCurrent || !haveCellVoltageStats ||
+float regenCalcCellChargeCurrentLimitA(uint32_t nowMs) {
+  if (!isRegenBmsPairValid || !hasBmsCurrent || !hasCellVoltageStats ||
       (uint32_t)(nowMs - lastBmsCellVoltageRxMs) > REGEN_BMS_DATA_TIMEOUT_MS ||
       (uint32_t)(nowMs - lastBmsCurrentRxMs) > REGEN_BMS_DATA_TIMEOUT_MS ||
       regenVoltageWindow.count == 0 ||
@@ -118,8 +118,8 @@ float regenCellChargeCurrentLimitA(uint32_t nowMs) {
 
   float maxTerminalV = 0.0f;
   float maxEstimatedOpenCircuitV = 0.0f;
-  if (!regenVoltageWindowMaximums(nowMs, maxTerminalV,
-                                  maxEstimatedOpenCircuitV)) {
+  if (!regenFindVoltageWindowMaximums(nowMs, maxTerminalV,
+                                      maxEstimatedOpenCircuitV)) {
     return 0.0f;
   }
 
@@ -133,16 +133,16 @@ float regenCellChargeCurrentLimitA(uint32_t nowMs) {
 
 // Returns a positive regen-torque magnitude. The caller applies it as negative
 // PM100 torque. Mechanical braking remains fully independent of this request.
-float calculateRegenTorqueNm() {
-  if (!REGEN_ENABLED || !braking || !haveBmsStatus || !appsPlausible ||
-      bspcActive || pedalPct > BSPC_APPS_RESET_PCT ||
+float regenCalculateTorqueNm() {
+  if (!IS_REGEN_ENABLED || !isBraking || !hasBmsStatus || !isAppsPlausible ||
+      isBspcActive || pedalPct > BSPC_APPS_RESET_PCT ||
       speedKmh <= REGEN_CUTOFF_SPEED_KMH) {
     return 0.0f;
   }
 
   // No fresh, synchronized BMS voltage/current pair means no safe basis for a
   // charging-current limit, so regen fails off.
-  float cellChargeCurrentLimitA = regenCellChargeCurrentLimitA(millis());
+  float cellChargeCurrentLimitA = regenCalcCellChargeCurrentLimitA(millis());
   if (cellChargeCurrentLimitA <= 0.0f) return 0.0f;
 
   // Triangular pressure curve: build regen through light braking, then taper

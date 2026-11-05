@@ -11,6 +11,6 @@
 
 #include <Arduino.h>
 
-void handleSerialConsoleInput();
+void consoleHandleInput();
 
 #endif  // VCU_SERIAL_CONSOLE_H

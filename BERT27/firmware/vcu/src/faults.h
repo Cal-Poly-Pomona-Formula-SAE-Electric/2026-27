@@ -13,7 +13,7 @@
 
 extern uint32_t startupFaultDelayStartMs;
 
-bool bmsImdFaultDetectionArmed();
-bool anyFaultActive();
+bool faultsIsBmsImdDetectionArmed();
+bool faultsIsAnyActive();
 
 #endif  // VCU_FAULTS_H

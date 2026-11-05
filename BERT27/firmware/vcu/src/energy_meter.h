@@ -14,19 +14,19 @@
 
 // Decoded Energy Meter values the dashboard and log read.
 extern float emVoltageV;
-extern bool haveEmMeasurement;
-extern bool haveEmStatus;
-extern uint8_t emNumSensors;
+extern bool hasEmMeasurement;
+extern bool hasEmStatus;
+extern uint8_t emSensorCount;
 extern uint8_t emMinTempRaw;
 extern uint8_t emMaxTempRaw;
-extern bool haveEmTempSummary;
-extern bool haveEmTemps;
-extern bool emTimedOut;
+extern bool hasEmTempSummary;
+extern bool hasEmTemps;
+extern bool isEmTimedOut;
 
-void handleEmMeasurementFrame(const CAN_message_t &msg);
-void handleEmStatusFrame(const CAN_message_t &msg);
-void handleEmTemperatureFrame(const CAN_message_t &msg);
-void serviceEnergyMeterTimeout(uint32_t now);
-const char *emStatusSummaryText(uint16_t &colorOut);
+void emHandleMeasurementFrame(const CAN_message_t &frame);
+void emHandleStatusFrame(const CAN_message_t &frame);
+void emHandleTemperatureFrame(const CAN_message_t &frame);
+void emServiceTimeout(uint32_t nowMs);
+const char *emGetStatusSummaryText(uint16_t &colorOut);
 
 #endif  // VCU_ENERGY_METER_H

@@ -19,7 +19,7 @@ struct ToneStep {
   uint16_t offMs;
 };
 
-void playTonePattern(const ToneStep *pattern, uint8_t length, bool repeats);
-void serviceBuzzer();
+void buzzerPlayPattern(const ToneStep *pattern, uint8_t length, bool repeats);
+void buzzerService();
 
 #endif  // VCU_BUZZER_H

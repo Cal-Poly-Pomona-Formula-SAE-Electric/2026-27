@@ -12,80 +12,80 @@
 #include "calibration.h"
 #include "inverter.h"
 
-uint8_t dutyPercentToFanPwmWrite(int dutyPercent);
+uint8_t fansConvertDutyPctToPwm(int requestedDutyPct);
 
 static constexpr uint32_t FAN_PWM_FREQUENCY_HZ = 20000;
 static constexpr uint8_t FAN_PWM_WRITE_MAX = 255;
 
 // Duty cycles are set automatically from motor/inverter temps unless a
 // manual override is entered over serial (digits = override, 'a' = auto).
-int fan1DutyPercent = FAN_DUTY_MIN_PERCENT;
-int fan2DutyPercent = FAN_DUTY_MIN_PERCENT;
-int fan1LastDutyPercent = -1;
-int fan2LastDutyPercent = -1;
-bool fanManualOverride = false;
+int fan1DutyPct = FAN_DUTY_MIN_PCT;
+int fan2DutyPct = FAN_DUTY_MIN_PCT;
+int fan1LastDutyPct = -1;
+int fan2LastDutyPct = -1;
+bool isFanManualOverride = false;
 
 // ---------------- Fans ----------------
-void setupFans() {
-  pinMode(FAN_1_PIN, OUTPUT);
-  pinMode(FAN_2_PIN, OUTPUT);
-  analogWriteFrequency(FAN_1_PIN, FAN_PWM_FREQUENCY_HZ);
-  analogWriteFrequency(FAN_2_PIN, FAN_PWM_FREQUENCY_HZ);
-  serviceFans();
+void fansSetup() {
+  pinMode(PIN_FAN_1, OUTPUT);
+  pinMode(PIN_FAN_2, OUTPUT);
+  analogWriteFrequency(PIN_FAN_1, FAN_PWM_FREQUENCY_HZ);
+  analogWriteFrequency(PIN_FAN_2, FAN_PWM_FREQUENCY_HZ);
+  fansService();
 }
 
-void updateFanDutyFromTemps() {
-  if (fanManualOverride) {
+void fansUpdateDutyFromTemps() {
+  if (isFanManualOverride) {
     return;
   }
 
   // Drive the fans from the hotter of the PM100 motor and inverter temps.
-  bool haveTemp = false;
+  bool hasTemp = false;
   float tempC = 0.0f;
-  if (haveInverterTemp) {
+  if (hasInverterTemp) {
     tempC = (float)inverterTempTenthsC / 10.0f;
-    haveTemp = true;
+    hasTemp = true;
   }
-  if (havePm100MotorTemp) {
+  if (hasPm100MotorTemp) {
     float motorTempC = (float)pm100MotorTempTenthsC / 10.0f;
-    if (!haveTemp || motorTempC > tempC) {
+    if (!hasTemp || motorTempC > tempC) {
       tempC = motorTempC;
     }
-    haveTemp = true;
+    hasTemp = true;
   }
 
-  int duty;
-  if (!haveTemp || tempC <= FAN_TEMP_MIN_C) {
-    duty = FAN_DUTY_MIN_PERCENT;
+  int dutyPct;
+  if (!hasTemp || tempC <= FAN_TEMP_MIN_C) {
+    dutyPct = FAN_DUTY_MIN_PCT;
   } else if (tempC >= FAN_TEMP_MAX_C) {
-    duty = FAN_DUTY_MAX_PERCENT;
+    dutyPct = FAN_DUTY_MAX_PCT;
   } else {
     float span = FAN_TEMP_MAX_C - FAN_TEMP_MIN_C;
     float fraction = (tempC - FAN_TEMP_MIN_C) / span;
-    duty = FAN_DUTY_MIN_PERCENT +
-           (int)(fraction * (float)(FAN_DUTY_MAX_PERCENT - FAN_DUTY_MIN_PERCENT) + 0.5f);
+    dutyPct = FAN_DUTY_MIN_PCT +
+           (int)(fraction * (float)(FAN_DUTY_MAX_PCT - FAN_DUTY_MIN_PCT) + 0.5f);
   }
 
-  fan1DutyPercent = duty;
-  fan2DutyPercent = duty;
+  fan1DutyPct = dutyPct;
+  fan2DutyPct = dutyPct;
 }
 
-void serviceFans() {
-  int duty1 = constrain(fan1DutyPercent, 0, 100);
-  int duty2 = constrain(fan2DutyPercent, 0, 100);
+void fansService() {
+  int duty1Pct = constrain(fan1DutyPct, 0, 100);
+  int duty2Pct = constrain(fan2DutyPct, 0, 100);
 
-  if (duty1 != fan1LastDutyPercent) {
-    fan1LastDutyPercent = duty1;
-    analogWrite(FAN_1_PIN, dutyPercentToFanPwmWrite(duty1));
+  if (duty1Pct != fan1LastDutyPct) {
+    fan1LastDutyPct = duty1Pct;
+    analogWrite(PIN_FAN_1, fansConvertDutyPctToPwm(duty1Pct));
   }
 
-  if (duty2 != fan2LastDutyPercent) {
-    fan2LastDutyPercent = duty2;
-    analogWrite(FAN_2_PIN, dutyPercentToFanPwmWrite(duty2));
+  if (duty2Pct != fan2LastDutyPct) {
+    fan2LastDutyPct = duty2Pct;
+    analogWrite(PIN_FAN_2, fansConvertDutyPctToPwm(duty2Pct));
   }
 }
 
-uint8_t dutyPercentToFanPwmWrite(int dutyPercent) {
-  int duty = constrain(dutyPercent, 0, 100);
-  return (uint8_t)((duty * FAN_PWM_WRITE_MAX + 50) / 100);
+uint8_t fansConvertDutyPctToPwm(int requestedDutyPct) {
+  int dutyPct = constrain(requestedDutyPct, 0, 100);
+  return (uint8_t)((dutyPct * FAN_PWM_WRITE_MAX + 50) / 100);
 }

@@ -14,14 +14,14 @@
 
 uint32_t startupFaultDelayStartMs = 0;
 
-bool bmsImdFaultDetectionArmed() {
+bool faultsIsBmsImdDetectionArmed() {
   return (millis() - startupFaultDelayStartMs) >= STARTUP_BMS_IMD_FAULT_DELAY_MS;
 }
 
-bool anyFaultActive() {
-  if (!bmsImdFaultDetectionArmed()) {
+bool faultsIsAnyActive() {
+  if (!faultsIsBmsImdDetectionArmed()) {
     return false;
   }
 
-  return imdFault || bmsFault;
+  return hasImdFault || hasBmsFault;
 }

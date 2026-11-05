@@ -94,26 +94,26 @@ struct __attribute__((packed)) CellLogRecord {
   float type, timeSeconds, cellIndex, value;
 };
 
-uint32_t nextLogSessionNumber();
-uint32_t maxLogSessionInDir(File dir);
-uint16_t logStatusFlags();
-void writeFastLogRecord(uint32_t nowMs);
-void writeMediumLogRecord(uint32_t nowMs);
-void writeSlowLogRecord(uint32_t nowMs);
-void flushSdLogBuffer(File &file, bool measuredLog);
-void appendCellLog(const void *data, size_t len);
-void flushCellLogBuffer();
-void flushAllSdLogBuffers();
-void listLogDir(File dir);
+uint32_t logFindNextSessionNumber();
+uint32_t logFindMaxSessionInDir(File dir);
+uint16_t logGetStatusFlags();
+void logWriteFastRecord(uint32_t nowMs);
+void logWriteMediumRecord(uint32_t nowMs);
+void logWriteSlowRecord(uint32_t nowMs);
+void logFlushSdBuffer(File &file, bool measuredLog);
+void logAppendCell(const void *data, size_t len);
+void logFlushCellBuffer();
+void logFlushAllSdBuffers();
+void logListDir(File dir);
 
-int rawHvCurrentLast = 0;
+int hvCurrentRawLast = 0;
 
 // Each log is staged independently in RAM and written in 512-byte chunks.
 File sdMeasuredLogFile;
 File sdDerivedLogFile;
 File sdCellLogFile;
-bool sdCardStarted = false;
-bool sdLogActive = false;
+bool isSdCardStarted = false;
+bool isSdLogActive = false;
 uint32_t logSessionNumber = 0;
 uint8_t measuredLogBuffer[512];
 uint8_t derivedLogBuffer[512];
@@ -123,14 +123,14 @@ size_t derivedLogBufferLen = 0;
 size_t cellLogBufferLen = 0;
 
 // ---------------- Data logging ----------------
-void setupDataLogging() {
-  sdCardStarted = SD.begin(BUILTIN_SDCARD);
-  if (!sdCardStarted) {
+void logSetup() {
+  isSdCardStarted = SD.begin(BUILTIN_SDCARD);
+  if (!isSdCardStarted) {
     Serial.println("[Log] No SD card found; data logging disabled");
     return;
   }
 
-  logSessionNumber = nextLogSessionNumber();
+  logSessionNumber = logFindNextSessionNumber();
 
   char measuredName[16];
   char derivedName[16];
@@ -171,7 +171,7 @@ void setupDataLogging() {
     sdMeasuredLogFile.flush();
     sdDerivedLogFile.flush();
     sdCellLogFile.flush();
-    sdLogActive = true;
+    isSdLogActive = true;
     Serial.print("[Log] Measured data: ");
     Serial.println(measuredName);
     Serial.print("[Log] Derived data:  ");
@@ -188,19 +188,19 @@ void setupDataLogging() {
 
 // One paired log per power cycle. Legacy LOG files are included so session
 // numbers are never reused on a card containing logs from older firmware.
-uint32_t nextLogSessionNumber() {
+uint32_t logFindNextSessionNumber() {
   uint32_t maxSession = 0;
 
   File root = SD.open("/");
   if (root) {
-    maxSession = maxLogSessionInDir(root);
+    maxSession = logFindMaxSessionInDir(root);
     root.close();
   }
 
   return maxSession + 1;
 }
 
-uint32_t maxLogSessionInDir(File dir) {
+uint32_t logFindMaxSessionInDir(File dir) {
   uint32_t maxSession = 0;
 
   for (File entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
@@ -218,8 +218,8 @@ uint32_t maxLogSessionInDir(File dir) {
   return maxSession;
 }
 
-void serviceDataLogging() {
-  if (!sdLogActive) {
+void logService() {
+  if (!isSdLogActive) {
     return;
   }
 
@@ -228,29 +228,29 @@ void serviceDataLogging() {
   static uint32_t lastSlowMs = 0;
   static uint32_t lastSdFlushMs = 0;
 
-  uint32_t now = millis();
+  uint32_t nowMs = millis();
 
-  if (now - lastFastMs >= LOG_FAST_PERIOD_MS) {
-    lastFastMs = now;
-    writeFastLogRecord(now);
-    writeImuLogRecord(now);
+  if (nowMs - lastFastMs >= LOG_FAST_PERIOD_MS) {
+    lastFastMs = nowMs;
+    logWriteFastRecord(nowMs);
+    imuWriteLogRecord(nowMs);
   }
 
-  if (now - lastMediumMs >= LOG_MEDIUM_PERIOD_MS) {
-    lastMediumMs = now;
-    writeMediumLogRecord(now);
+  if (nowMs - lastMediumMs >= LOG_MEDIUM_PERIOD_MS) {
+    lastMediumMs = nowMs;
+    logWriteMediumRecord(nowMs);
   }
 
-  if (now - lastSlowMs >= LOG_SLOW_PERIOD_MS) {
-    lastSlowMs = now;
-    writeSlowLogRecord(now);
+  if (nowMs - lastSlowMs >= LOG_SLOW_PERIOD_MS) {
+    lastSlowMs = nowMs;
+    logWriteSlowRecord(nowMs);
   }
 
   // Periodic flush bounds data loss at power-off to about one second.
-  if (sdLogActive && now - lastSdFlushMs >= LOG_SD_FLUSH_PERIOD_MS) {
-    lastSdFlushMs = now;
-    flushAllSdLogBuffers();
-    if (sdLogActive) {
+  if (isSdLogActive && nowMs - lastSdFlushMs >= LOG_SD_FLUSH_PERIOD_MS) {
+    lastSdFlushMs = nowMs;
+    logFlushAllSdBuffers();
+    if (isSdLogActive) {
       sdMeasuredLogFile.flush();
       sdDerivedLogFile.flush();
       sdCellLogFile.flush();
@@ -258,41 +258,41 @@ void serviceDataLogging() {
   }
 }
 
-uint16_t logStatusFlags() {
+uint16_t logGetStatusFlags() {
   uint16_t flags = 0;
-  if (braking)                              flags |= 1u << 0;
-  if (hardBraking)                          flags |= 1u << 1;
-  if (bspcActive)                           flags |= 1u << 2;
-  if (appsPlausible)                        flags |= 1u << 3;
-  if (readyToDriveLatched)                  flags |= 1u << 4;
+  if (isBraking)                              flags |= 1u << 0;
+  if (isHardBraking)                          flags |= 1u << 1;
+  if (isBspcActive)                           flags |= 1u << 2;
+  if (isAppsPlausible)                        flags |= 1u << 3;
+  if (isReadyToDriveLatched)                  flags |= 1u << 4;
   if (driveMode == 'D')                     flags |= 1u << 5;
-  if (bmsFault)                             flags |= 1u << 6;
-  if (imdFault)                             flags |= 1u << 7;
-  if (pm100Fault)                           flags |= 1u << 8;
-  if (bmsTimedOut)                          flags |= 1u << 9;
-  if (imdCanTimedOut)                       flags |= 1u << 10;
-  if (!contactorsOpen())                    flags |= 1u << 11;
-  if (digitalRead(BSPD_STATUS_PIN) == HIGH) flags |= 1u << 12;
-  if (digitalRead(IMD_STATUS_PIN) == HIGH)  flags |= 1u << 13;
-  if (digitalRead(BMS_STATUS_PIN) == HIGH)  flags |= 1u << 14;
+  if (hasBmsFault)                             flags |= 1u << 6;
+  if (hasImdFault)                             flags |= 1u << 7;
+  if (hasPm100Fault)                           flags |= 1u << 8;
+  if (isBmsTimedOut)                          flags |= 1u << 9;
+  if (isImdCanTimedOut)                       flags |= 1u << 10;
+  if (!bmsAreContactorsOpen())                    flags |= 1u << 11;
+  if (digitalRead(PIN_BSPD_STATUS) == HIGH) flags |= 1u << 12;
+  if (digitalRead(PIN_IMD_STATUS) == HIGH)  flags |= 1u << 13;
+  if (digitalRead(PIN_BMS_STATUS) == HIGH)  flags |= 1u << 14;
   return flags;
 }
 
-void writeFastLogRecord(uint32_t nowMs) {
-  rawHvCurrentLast = analogRead(HV_CURRENT_SENSE_PIN);
+void logWriteFastRecord(uint32_t nowMs) {
+  hvCurrentRawLast = analogRead(PIN_HV_CURRENT_SENSE);
 
   MeasuredFastRecord measured;
   measured.type = (float)LOG_RECORD_FAST;
   measured.timeSeconds = (float)nowMs / 1000.0f;
-  measured.apps1AdcCounts = (float)rawApps1Last;
-  measured.apps2AdcCounts = (float)rawApps2Last;
-  measured.bse1AdcCounts = (float)rawBse1Last;
-  measured.bse2AdcCounts = (float)rawBse2Last;
-  measured.hvCurrentAdcCounts = (float)rawHvCurrentLast;
+  measured.apps1AdcCounts = (float)apps1RawLast;
+  measured.apps2AdcCounts = (float)apps2RawLast;
+  measured.bse1AdcCounts = (float)bse1RawLast;
+  measured.bse2AdcCounts = (float)bse2RawLast;
+  measured.hvCurrentAdcCounts = (float)hvCurrentRawLast;
   measured.motorRpm = (float)motorRpm;
-  measured.busVoltageV = inverterDcBusVoltage;
-  measured.busCurrentA = inverterDcBusCurrent;
-  appendSdLog(sdMeasuredLogFile, true, &measured, sizeof(measured));
+  measured.busVoltageV = inverterDcBusVoltageV;
+  measured.busCurrentA = inverterDcBusCurrentA;
+  logAppendSd(sdMeasuredLogFile, true, &measured, sizeof(measured));
 
   DerivedFastRecord derived;
   derived.type = (float)LOG_RECORD_FAST;
@@ -302,25 +302,25 @@ void writeFastLogRecord(uint32_t nowMs) {
   derived.regenTorqueNm = regenTorqueNm;
   derived.speedKmh = speedKmh;
   derived.cumulativeDistanceKm = cumulativeDistanceKm;
-  derived.statusFlags = (float)logStatusFlags();
-  appendSdLog(sdDerivedLogFile, false, &derived, sizeof(derived));
+  derived.statusFlags = (float)logGetStatusFlags();
+  logAppendSd(sdDerivedLogFile, false, &derived, sizeof(derived));
 }
 
-void writeMediumLogRecord(uint32_t nowMs) {
+void logWriteMediumRecord(uint32_t nowMs) {
   MeasuredMediumRecord measured;
   measured.type = (float)LOG_RECORD_MEDIUM;
   measured.timeSeconds = (float)nowMs / 1000.0f;
-  measured.glvVoltageV = haveGlvVoltage ? glvVoltage : NAN;
-  measured.inverterTempC = haveInverterTemp ? (float)inverterTempTenthsC / 10.0f : NAN;
-  measured.motorTempC = havePm100MotorTemp ? (float)pm100MotorTempTenthsC / 10.0f : NAN;
-  measured.socPct = haveBmsStatus ? (float)stateOfChargePct : NAN;
-  measured.batteryTempC = haveCellTempStats ? (float)batteryTempC : NAN;
+  measured.glvVoltageV = hasGlvVoltage ? glvVoltageV : NAN;
+  measured.inverterTempC = hasInverterTemp ? (float)inverterTempTenthsC / 10.0f : NAN;
+  measured.motorTempC = hasPm100MotorTemp ? (float)pm100MotorTempTenthsC / 10.0f : NAN;
+  measured.socPct = hasBmsStatus ? (float)stateOfChargePct : NAN;
+  measured.batteryTempC = hasCellTempStats ? (float)batteryTempC : NAN;
   measured.bmsFlags = (float)bmsFlags;
-  measured.bmsFaultCode = haveBms2026FaultCode ? (float)bms2026FaultCode : NAN;
+  measured.bmsFaultCode = hasBms2026FaultCode ? (float)bms2026FaultCode : NAN;
   measured.imdWarnAlarms = (float)imdWarnAlarms;
   measured.pm100PostFaults = (float)pm100PostFaults;
   measured.pm100RunFaults = (float)pm100RunFaults;
-  appendSdLog(sdMeasuredLogFile, true, &measured, sizeof(measured));
+  logAppendSd(sdMeasuredLogFile, true, &measured, sizeof(measured));
 
   DerivedMediumRecord derived;
   derived.type = (float)LOG_RECORD_MEDIUM;
@@ -331,39 +331,39 @@ void writeMediumLogRecord(uint32_t nowMs) {
   derived.desiredTorqueNm = desiredTorqueNm;
   derived.powerKw = powerKw;
   derived.speedMph = speedMph;
-  derived.fanDutyPct = (float)constrain(fan1DutyPercent, 0, 100);
+  derived.fanDutyPct = (float)constrain(fan1DutyPct, 0, 100);
   derived.rtdState = (float)rtdState;
-  appendSdLog(sdDerivedLogFile, false, &derived, sizeof(derived));
+  logAppendSd(sdDerivedLogFile, false, &derived, sizeof(derived));
 }
 
-void writeSlowLogRecord(uint32_t nowMs) {
+void logWriteSlowRecord(uint32_t nowMs) {
   MeasuredSlowRecord measured;
   measured.type = (float)LOG_RECORD_SLOW;
   measured.timeSeconds = (float)nowMs / 1000.0f;
-  measured.minCellVoltageV = haveCellVoltageStats ? (float)minCellVoltageMv / 1000.0f : NAN;
-  measured.maxCellVoltageV = haveCellVoltageStats ? (float)maxCellVoltageMv / 1000.0f : NAN;
-  measured.avgCellVoltageV = haveCellVoltageStats ? (float)avgCellVoltageMv / 1000.0f : NAN;
-  measured.minCellTempC = haveCellTempStats ? (float)minCellTempC : NAN;
-  measured.maxCellTempC = haveCellTempStats ? (float)maxCellTempC : NAN;
-  measured.avgCellTempC = haveCellTempStats ? (float)avgCellTempC : NAN;
+  measured.minCellVoltageV = hasCellVoltageStats ? (float)minCellVoltageMv / 1000.0f : NAN;
+  measured.maxCellVoltageV = hasCellVoltageStats ? (float)maxCellVoltageMv / 1000.0f : NAN;
+  measured.avgCellVoltageV = hasCellVoltageStats ? (float)avgCellVoltageMv / 1000.0f : NAN;
+  measured.minCellTempC = hasCellTempStats ? (float)minCellTempC : NAN;
+  measured.maxCellTempC = hasCellTempStats ? (float)maxCellTempC : NAN;
+  measured.avgCellTempC = hasCellTempStats ? (float)avgCellTempC : NAN;
   measured.imdRIsoKohm = (imdRIsoKohm != IMD_SNV_WORD) ? (float)imdRIsoKohm : NAN;
   measured.imdRIsoStatus = (float)imdRIsoStatus;
-  measured.validFlags = (float)((haveCellVoltageStats ? 0x01 : 0) |
-                                (haveCellTempStats ? 0x02 : 0) |
-                                (haveGlvVoltage ? 0x04 : 0));
-  appendSdLog(sdMeasuredLogFile, true, &measured, sizeof(measured));
+  measured.validFlags = (float)((hasCellVoltageStats ? 0x01 : 0) |
+                                (hasCellTempStats ? 0x02 : 0) |
+                                (hasGlvVoltage ? 0x04 : 0));
+  logAppendSd(sdMeasuredLogFile, true, &measured, sizeof(measured));
 }
 
-void appendSdLog(File &file, bool measuredLog, const void *data, size_t len) {
-  if (!sdLogActive) {
+void logAppendSd(File &file, bool measuredLog, const void *data, size_t len) {
+  if (!isSdLogActive) {
     return;
   }
 
   uint8_t *buffer = measuredLog ? measuredLogBuffer : derivedLogBuffer;
   size_t &bufferLen = measuredLog ? measuredLogBufferLen : derivedLogBufferLen;
   if (bufferLen + len > 512) {
-    flushSdLogBuffer(file, measuredLog);
-    if (!sdLogActive) {
+    logFlushSdBuffer(file, measuredLog);
+    if (!isSdLogActive) {
       return;
     }
   }
@@ -372,10 +372,10 @@ void appendSdLog(File &file, bool measuredLog, const void *data, size_t len) {
   bufferLen += len;
 }
 
-void flushSdLogBuffer(File &file, bool measuredLog) {
+void logFlushSdBuffer(File &file, bool measuredLog) {
   uint8_t *buffer = measuredLog ? measuredLogBuffer : derivedLogBuffer;
   size_t &bufferLen = measuredLog ? measuredLogBufferLen : derivedLogBufferLen;
-  if (!sdLogActive || bufferLen == 0) {
+  if (!isSdLogActive || bufferLen == 0) {
     bufferLen = 0;
     return;
   }
@@ -386,24 +386,24 @@ void flushSdLogBuffer(File &file, bool measuredLog) {
     sdMeasuredLogFile.close();
     sdDerivedLogFile.close();
     sdCellLogFile.close();
-    sdLogActive = false;
-    screenDirty = true;
+    isSdLogActive = false;
+    isScreenDirty = true;
   }
   bufferLen = 0;
 }
 
-void appendCellLog(const void *data, size_t len) {
-  if (!sdLogActive) return;
+void logAppendCell(const void *data, size_t len) {
+  if (!isSdLogActive) return;
   if (cellLogBufferLen + len > sizeof(cellLogBuffer)) {
-    flushCellLogBuffer();
-    if (!sdLogActive) return;
+    logFlushCellBuffer();
+    if (!isSdLogActive) return;
   }
   memcpy(cellLogBuffer + cellLogBufferLen, data, len);
   cellLogBufferLen += len;
 }
 
-void flushCellLogBuffer() {
-  if (!sdLogActive || cellLogBufferLen == 0) {
+void logFlushCellBuffer() {
+  if (!isSdLogActive || cellLogBufferLen == 0) {
     cellLogBufferLen = 0;
     return;
   }
@@ -412,20 +412,20 @@ void flushCellLogBuffer() {
     sdMeasuredLogFile.close();
     sdDerivedLogFile.close();
     sdCellLogFile.close();
-    sdLogActive = false;
-    screenDirty = true;
+    isSdLogActive = false;
+    isScreenDirty = true;
   }
   cellLogBufferLen = 0;
 }
 
-void flushAllSdLogBuffers() {
-  flushSdLogBuffer(sdMeasuredLogFile, true);
-  flushSdLogBuffer(sdDerivedLogFile, false);
-  flushCellLogBuffer();
+void logFlushAllSdBuffers() {
+  logFlushSdBuffer(sdMeasuredLogFile, true);
+  logFlushSdBuffer(sdDerivedLogFile, false);
+  logFlushCellBuffer();
 }
 
-void listLogFiles() {
-  if (!sdCardStarted) {
+void logListFiles() {
+  if (!isSdCardStarted) {
     Serial.println("[Log] SD card not available");
     return;
   }
@@ -433,12 +433,12 @@ void listLogFiles() {
   Serial.println("[Log] SD card:");
   File root = SD.open("/");
   if (root) {
-    listLogDir(root);
+    logListDir(root);
     root.close();
   }
 }
 
-void listLogDir(File dir) {
+void logListDir(File dir) {
   for (File entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
     if (!entry.isDirectory()) {
       Serial.print("  ");
@@ -453,15 +453,15 @@ void listLogDir(File dir) {
 
 // Hex-dumps all files in a session over serial so logs can be exported
 // without pulling the SD card.
-void dumpLogFile(uint32_t session) {
-  if (!sdCardStarted) {
+void logDumpFile(uint32_t session) {
+  if (!isSdCardStarted) {
     Serial.println("[Log] SD card not available");
     return;
   }
 
   // Make sure everything buffered for the current session is on the card.
-  flushAllSdLogBuffers();
-  if (sdLogActive) {
+  logFlushAllSdBuffers();
+  if (isSdLogActive) {
     sdMeasuredLogFile.flush();
     sdDerivedLogFile.flush();
     sdCellLogFile.flush();
@@ -472,8 +472,8 @@ void dumpLogFile(uint32_t session) {
     char name[16];
     snprintf(name, sizeof(name), "%s%04lu.BIN", prefixes[fileIndex],
              (unsigned long)session);
-    File f = SD.open(name, FILE_READ);
-    if (!f) {
+    File dumpFile = SD.open(name, FILE_READ);
+    if (!dumpFile) {
       Serial.print("[Log] ");
       Serial.print(name);
       Serial.println(" not found");
@@ -483,46 +483,46 @@ void dumpLogFile(uint32_t session) {
     Serial.print("[Log] DUMP BEGIN ");
     Serial.print(name);
     Serial.print(" ");
-    Serial.println((unsigned long)f.size());
+    Serial.println((unsigned long)dumpFile.size());
 
     uint8_t buf[32];
     int n;
-    while ((n = f.read(buf, sizeof(buf))) > 0) {
-      for (int i = 0; i < n; i++) printCanHexByte(buf[i]);
+    while ((n = dumpFile.read(buf, sizeof(buf))) > 0) {
+      for (int i = 0; i < n; i++) tracePrintCanHexByte(buf[i]);
       Serial.println();
     }
-    f.close();
+    dumpFile.close();
     Serial.println("[Log] DUMP END");
   }
 }
 
-void writeCellDataResponseLog(const CAN_message_t &msg) {
-  if (!sdLogActive || msg.flags.extended || msg.len < 2) return;
+void logWriteCellDataResponse(const CAN_message_t &frame) {
+  if (!isSdLogActive || frame.flags.extended || frame.len < 2) return;
 
-  const uint16_t frameIndex = msg.buf[0];
+  const uint16_t frameIndex = frame.buf[0];
   const float timeSeconds = (float)millis() / 1000.0f;
 
   if (lastCellDataRequestType == CELL_DATA_REQUEST_VOLTAGES) {
-    for (uint8_t i = 0; i < 3 && (1 + i * 2 + 1) < msg.len; i++) {
+    for (uint8_t i = 0; i < 3 && (1 + i * 2 + 1) < frame.len; i++) {
       const uint16_t zeroBasedCell = frameIndex * 3u + i;
       if (zeroBasedCell >= BMS_CELL_COUNT) break;
-      const uint16_t millivolts = u16Be(msg.buf[1 + i * 2], msg.buf[2 + i * 2]);
+      const uint16_t millivolts = canReadU16Be(frame.buf[1 + i * 2], frame.buf[2 + i * 2]);
       CellLogRecord record = {
         (float)CELL_DATA_REQUEST_VOLTAGES, timeSeconds, (float)(zeroBasedCell + 1u),
         millivolts == 0xFFFF ? NAN : (float)millivolts / 1000.0f
       };
-      appendCellLog(&record, sizeof(record));
+      logAppendCell(&record, sizeof(record));
     }
   } else if (lastCellDataRequestType == CELL_DATA_REQUEST_TEMPERATURES) {
-    for (uint8_t i = 0; i < 7 && (1 + i) < msg.len; i++) {
+    for (uint8_t i = 0; i < 7 && (1 + i) < frame.len; i++) {
       const uint16_t zeroBasedCell = frameIndex * 7u + i;
       if (zeroBasedCell >= BMS_CELL_COUNT) break;
-      const uint8_t rawTemperature = msg.buf[1 + i];
+      const uint8_t rawTemperature = frame.buf[1 + i];
       CellLogRecord record = {
         (float)CELL_DATA_REQUEST_TEMPERATURES, timeSeconds, (float)(zeroBasedCell + 1u),
         rawTemperature == 0xFF ? NAN : (float)((int)rawTemperature - 40)
       };
-      appendCellLog(&record, sizeof(record));
+      logAppendCell(&record, sizeof(record));
     }
   }
 }

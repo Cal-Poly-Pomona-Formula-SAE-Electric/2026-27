@@ -15,7 +15,7 @@ uint32_t lastDistanceUpdateMs = 0;
 
 // Integrate the RPM-derived road speed. This is intentionally approximate:
 // MPH_PER_RPM already embodies the vehicle's gearing and tire circumference.
-void updateCumulativeDistance(uint32_t nowMs) {
+void speedUpdateCumulativeDistance(uint32_t nowMs) {
   if (lastDistanceUpdateMs != 0) {
     float elapsedHours = (float)(nowMs - lastDistanceUpdateMs) / 3600000.0f;
     cumulativeDistanceKm += speedKmh * elapsedHours;

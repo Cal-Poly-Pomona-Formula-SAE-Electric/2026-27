@@ -13,10 +13,10 @@
 
 static const float    TORQUE_PER_KW_PER_RPM      = 9549.0f;  // 60000 / (2*pi)
 
-extern bool powerDerateActive;
+extern bool isPowerDerateActive;
 extern float powerDerateKw;
 
-float powerDerateTorqueCapNm(int16_t rpm);
-void servicePowerDerate(uint32_t nowMs);
+float derateCalcTorqueCapNm(int16_t rpm);
+void derateService(uint32_t nowMs);
 
 #endif  // VCU_POWER_DERATE_H

@@ -16,118 +16,118 @@
 #include "rtd.h"
 #include "dashboard.h"
 
-void updateTssiLed(bool faultActive, uint32_t now);
-void setTssiGreenOn();
-void setTssiRedOn();
-void setTssiRedOff();
-void setTssiAllOff();
+void tssiUpdateLed(bool isFaultActive, uint32_t nowMs);
+void tssiSetGreenOn();
+void tssiSetRedOn();
+void tssiSetRedOff();
+void tssiSetAllOff();
 
 static constexpr uint32_t IMD_GET_REQ_PERIOD_MS    = 500;
 
 uint32_t tssiBlinkTimerMs = 0;
-bool tssiRedOn = false;
+bool isTssiRedOn = false;
 // Once the TSSI has blinked red for any fault it stays latched in the red-blink
 // state until the board is power-cycled (this flag clears on reset).
-bool tssiFaultLatched = false;
+bool isTssiFaultLatched = false;
 uint32_t lastImdGetReqMs = 0;
 
-bool tssiFaultFromWarnBits(uint16_t warnBits) {
+bool tssiHasFaultInWarnBits(uint16_t warnBits) {
   return (warnBits & IMD_FAULT_BITS_MASK) != 0;
 }
 
-void setupTssi() {
-  pinMode(TSSI_LED_RED, OUTPUT);
-  pinMode(TSSI_LED_GREEN, OUTPUT);
-  setTssiAllOff();
+void tssiSetup() {
+  pinMode(PIN_TSSI_LED_RED, OUTPUT);
+  pinMode(PIN_TSSI_LED_GREEN, OUTPUT);
+  tssiSetAllOff();
 
-  imdFault = true;
-  imdCanTimedOut = true;
+  hasImdFault = true;
+  isImdCanTimedOut = true;
   lastImdRxMs = millis();
   tssiBlinkTimerMs = millis();
   lastImdGetReqMs = 0;
 }
 
-void serviceTssi() {
-  uint32_t now = millis();
-  bool faultDetectionArmed = bmsImdFaultDetectionArmed();
+void tssiService() {
+  uint32_t nowMs = millis();
+  bool isFaultDetectionArmed = faultsIsBmsImdDetectionArmed();
 
-  if (faultDetectionArmed && now - lastImdRxMs > IMD_HEARTBEAT_TIMEOUT_MS) {
-    if (!imdCanTimedOut) {
+  if (isFaultDetectionArmed && nowMs - lastImdRxMs > IMD_HEARTBEAT_TIMEOUT_MS) {
+    if (!isImdCanTimedOut) {
       Serial.println("[TSSI] IMD heartbeat lost, forcing FAULT");
-      showFaultBanner("IMD Timeout");
+      dashShowFaultBanner("IMD Timeout");
     }
-    imdCanTimedOut = true;
-    imdFault = true;
+    isImdCanTimedOut = true;
+    hasImdFault = true;
   }
 
-  if ((anyFaultActive() || contactorsOpen()) && readyToDriveLatched) {
-    dropReadyToDrive(rtdDropCauseText());
+  if ((faultsIsAnyActive() || bmsAreContactorsOpen()) && isReadyToDriveLatched) {
+    rtdDrop(rtdGetDropCauseText());
   }
 
-  if (now - lastImdGetReqMs >= IMD_GET_REQ_PERIOD_MS) {
-    lastImdGetReqMs = now;
-    requestImdWarnings();
+  if (nowMs - lastImdGetReqMs >= IMD_GET_REQ_PERIOD_MS) {
+    lastImdGetReqMs = nowMs;
+    imdRequestWarnings();
   }
 
   // Latch the red blink the first time a fault is seen; once latched the TSSI
   // stays red until power cycle, even if the underlying fault clears.
-  if (faultDetectionArmed && anyFaultActive()) {
-    tssiFaultLatched = true;
+  if (isFaultDetectionArmed && faultsIsAnyActive()) {
+    isTssiFaultLatched = true;
   }
 
-  if (tssiFaultLatched) {
-    updateTssiLed(true, now);
-  } else if (!faultDetectionArmed) {
-    setTssiGreenOn();
+  if (isTssiFaultLatched) {
+    tssiUpdateLed(true, nowMs);
+  } else if (!isFaultDetectionArmed) {
+    tssiSetGreenOn();
   } else {
-    updateTssiLed(anyFaultActive(), now);
+    tssiUpdateLed(faultsIsAnyActive(), nowMs);
   }
 }
 
-void updateTssiLed(bool faultActive, uint32_t now) {
-  if (faultActive) {
-    uint32_t elapsed = now - tssiBlinkTimerMs;
-    if (elapsed >= TSSI_BLINK_PERIOD_MS) {
+void tssiUpdateLed(bool isFaultActive, uint32_t nowMs) {
+  if (isFaultActive) {
+    uint32_t elapsedMs = nowMs - tssiBlinkTimerMs;
+    if (elapsedMs >= TSSI_BLINK_PERIOD_MS) {
       tssiBlinkTimerMs += TSSI_BLINK_PERIOD_MS;
-      elapsed = now - tssiBlinkTimerMs;
+      elapsedMs = nowMs - tssiBlinkTimerMs;
     }
 
-    if (elapsed < TSSI_BLINK_ON_MS) {
-      if (!tssiRedOn) {
-        setTssiRedOn();
+    if (elapsedMs < TSSI_BLINK_ON_MS) {
+      if (!isTssiRedOn) {
+        tssiSetRedOn();
       }
-    } else if (tssiRedOn) {
-      setTssiRedOff();
+    } else if (isTssiRedOn) {
+      tssiSetRedOff();
     }
   } else {
-    setTssiGreenOn();
+    tssiSetGreenOn();
   }
 }
 
-void setTssiGreenOn() {
-  digitalWrite(TSSI_LED_RED, LOW);
-  digitalWrite(TSSI_LED_GREEN, HIGH);
-  tssiRedOn = false;
+void tssiSetGreenOn() {
+  digitalWrite(PIN_TSSI_LED_RED, LOW);
+  digitalWrite(PIN_TSSI_LED_GREEN, HIGH);
+  isTssiRedOn = false;
 }
 
-void setTssiRedOn() {
-  digitalWrite(TSSI_LED_GREEN, LOW);
-  digitalWrite(TSSI_LED_RED, HIGH);
-  tssiRedOn = true;
+void tssiSetRedOn() {
+  digitalWrite(PIN_TSSI_LED_GREEN, LOW);
+  digitalWrite(PIN_TSSI_LED_RED, HIGH);
+  isTssiRedOn = true;
 }
 
-void setTssiRedOff() {
-  digitalWrite(TSSI_LED_RED, LOW);
-  tssiRedOn = false;
+void tssiSetRedOff() {
+  digitalWrite(PIN_TSSI_LED_RED, LOW);
+  isTssiRedOn = false;
 }
 
-void setTssiAllOff() {
-  digitalWrite(TSSI_LED_GREEN, LOW);
-  digitalWrite(TSSI_LED_RED, LOW);
-  tssiRedOn = false;
+void tssiSetAllOff() {
+  digitalWrite(PIN_TSSI_LED_GREEN, LOW);
+  digitalWrite(PIN_TSSI_LED_RED, LOW);
+  isTssiRedOn = false;
 }
 
-void printTssiWarnBits(uint16_t bits) {
+void tssiPrintWarnBits(uint16_t bits) {
   if (bits & (1u << 0)) Serial.print(" [DeviceError]");
   if (bits & (1u << 1)) Serial.print(" [HV+ConnFail]");
   if (bits & (1u << 2)) Serial.print(" [HV-ConnFail]");

@@ -19,14 +19,14 @@ enum RtdState {
 
 extern char driveMode;
 extern RtdState rtdState;
-extern bool readyToDriveLatched;
-extern bool readyButtonLast;
+extern bool isReadyToDriveLatched;
+extern bool wasReadyButtonPressed;
 
-void serviceReadyToDrive();
-bool readReadyButtonPressed();
-void refreshRtdStateFromInputs();
-void dropReadyToDrive(const char *reason);
-const char *rtdDropCauseText();
-void setDriveMode(char newDriveMode);
+void rtdService();
+bool rtdReadButtonPressed();
+void rtdRefreshStateFromInputs();
+void rtdDrop(const char *reason);
+const char *rtdGetDropCauseText();
+void rtdSetDriveMode(char newDriveMode);
 
 #endif  // VCU_RTD_H

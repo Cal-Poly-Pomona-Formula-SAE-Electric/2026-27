@@ -11,63 +11,63 @@
 #include "fans.h"
 #include "data_log.h"
 
-void handleSerialConsoleCommand(const char *cmd);
+void consoleHandleCommand(const char *cmd);
 
 // Line-based serial console: 0-100 = manual fan duty, 'a' = auto fans,
 // 'l' = list log files, 'd<n>' = hex-dump log session n for export.
-void handleSerialConsoleInput() {
+void consoleHandleInput() {
   static char input[12];
   static uint8_t index = 0;
 
   while (Serial.available()) {
-    char c = (char)Serial.read();
+    char inputChar = (char)Serial.read();
 
-    if (c == '\n' || c == '\r') {
+    if (inputChar == '\n' || inputChar == '\r') {
       if (index > 0) {
         input[index] = '\0';
         index = 0;
-        handleSerialConsoleCommand(input);
+        consoleHandleCommand(input);
       }
     } else if (index < sizeof(input) - 1) {
-      input[index++] = c;
+      input[index++] = inputChar;
     } else {
       index = 0;
     }
   }
 }
 
-void handleSerialConsoleCommand(const char *cmd) {
+void consoleHandleCommand(const char *cmd) {
   if (strcmp(cmd, "a") == 0 || strcmp(cmd, "A") == 0) {
-    fanManualOverride = false;
+    isFanManualOverride = false;
     Serial.println("[Fans] Automatic temperature control resumed");
     return;
   }
 
   if (strcmp(cmd, "l") == 0 || strcmp(cmd, "L") == 0) {
-    listLogFiles();
+    logListFiles();
     return;
   }
 
   if ((cmd[0] == 'd' || cmd[0] == 'D') && cmd[1] >= '0' && cmd[1] <= '9') {
-    dumpLogFile((uint32_t)atoi(cmd + 1));
+    logDumpFile((uint32_t)atoi(cmd + 1));
     return;
   }
 
-  bool allDigits = cmd[0] != '\0';
-  for (const char *p = cmd; *p; p++) {
-    if (*p < '0' || *p > '9') {
-      allDigits = false;
+  bool isAllDigits = cmd[0] != '\0';
+  for (const char *cmdCursor = cmd; *cmdCursor; cmdCursor++) {
+    if (*cmdCursor < '0' || *cmdCursor > '9') {
+      isAllDigits = false;
       break;
     }
   }
 
-  if (allDigits) {
+  if (isAllDigits) {
     int value = atoi(cmd);
     // Manual override: enter 0-100 to force both fan PWM duties.
     if (value >= 0 && value <= 100) {
-      fanManualOverride = true;
-      fan1DutyPercent = value;
-      fan2DutyPercent = value;
+      isFanManualOverride = true;
+      fan1DutyPct = value;
+      fan2DutyPct = value;
       Serial.print("[Fans] Manual override duty set to ");
       Serial.print(value);
       Serial.println("% (send 'a' for auto)");

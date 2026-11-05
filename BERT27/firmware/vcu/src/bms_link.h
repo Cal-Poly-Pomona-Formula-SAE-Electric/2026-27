@@ -15,34 +15,34 @@
 static constexpr uint32_t BMS_CELL_REQUEST_2026_ID  = 0x312;
 static constexpr int16_t CELL_TEMP_UNKNOWN_C = -1000;
 
-extern bool regenBmsPairValid;
-extern float packVoltage;
-extern float packCurrent;
+extern bool isRegenBmsPairValid;
+extern float packVoltageV;
+extern float packCurrentA;
 extern uint8_t stateOfChargePct;
 extern uint8_t batteryTempC;
 extern uint16_t minCellVoltageMv;
 extern uint16_t maxCellVoltageMv;
 extern uint16_t avgCellVoltageMv;
-extern bool haveCellVoltageStats;
+extern bool hasCellVoltageStats;
 extern int16_t minCellTempC;
 extern int16_t maxCellTempC;
 extern int16_t avgCellTempC;
-extern bool haveCellTempStats;
-extern bool bmsActive;
-extern bool bmsFault;
-extern bool bmsTimedOut;
-extern bool haveBmsStatus;
+extern bool hasCellTempStats;
+extern bool isBmsActive;
+extern bool hasBmsFault;
+extern bool isBmsTimedOut;
+extern bool hasBmsStatus;
 extern uint8_t bmsFlags;
 extern uint8_t bms2026FaultCode;
-extern bool haveBms2026FaultCode;
+extern bool hasBms2026FaultCode;
 extern uint32_t lastBmsRxMs;
-extern bool haveBmsCurrent;
+extern bool hasBmsCurrent;
 extern uint32_t lastBmsCellVoltageRxMs;
 extern uint32_t lastBmsCurrentRxMs;
 
-void serviceCellDataRequests(uint32_t nowMs);
-bool contactorsOpen();
-void handleBms2026StatusFrame(const CAN_message_t &msg);
-void handleBms2026TempFrame(const CAN_message_t &msg);
+void bmsServiceCellDataRequests(uint32_t nowMs);
+bool bmsAreContactorsOpen();
+void bmsHandleStatusFrame(const CAN_message_t &frame);
+void bmsHandleTempFrame(const CAN_message_t &frame);
 
 #endif  // VCU_BMS_LINK_H

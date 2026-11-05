@@ -10,45 +10,45 @@
 #define VCU_PINS_H
 
 // ---------------- Display / touch pins ----------------
-static const int TFT_MISO = 12;
-static const int TFT_MOSI = 11;
-static const int TFT_SCK  = 13;
-static const int TFT_DC   = 8;
-static const int TFT_CS   = 10;
-static const int TFT_RST  = 9;
-static const int TFT_LED  = 29;
+static const int PIN_TFT_MISO = 12;
+static const int PIN_TFT_MOSI = 11;
+static const int PIN_TFT_SCK  = 13;
+static const int PIN_TFT_DC   = 8;
+static const int PIN_TFT_CS   = 10;
+static const int PIN_TFT_RST  = 9;
+static const int PIN_TFT_LED  = 29;
 
-static const int TOUCH_CS   = 7;
-static const int TOUCH_IRQ  = 6;
+static const int PIN_TOUCH_CS   = 7;
+static const int PIN_TOUCH_IRQ  = 6;
 
 // ---------------- Vehicle IO ----------------
-static const int READY_BUTTON_PIN = 23;
-static const int BUZZER_PIN       = 22;    // Change here if the buzzer is wired elsewhere.
-static const int BRAKE_LIGHT_PIN  = 5;     // HIGH = brake light on
-static const int FAN_1_PIN        = 1;
-static const int FAN_2_PIN        = 2;
+static const int PIN_READY_BUTTON = 23;
+static const int PIN_BUZZER       = 22;    // Change here if the buzzer is wired elsewhere.
+static const int PIN_BRAKE_LIGHT  = 5;     // HIGH = brake light on
+static const int PIN_FAN_1        = 1;
+static const int PIN_FAN_2        = 2;
 
 // Shutdown-circuit status inputs: HIGH = signal OK (green), LOW = tripped (red).
-static const int BSPD_STATUS_PIN  = 24;
-static const int IMD_STATUS_PIN   = 25;
-static const int BMS_STATUS_PIN   = 28;
+static const int PIN_BSPD_STATUS  = 24;
+static const int PIN_IMD_STATUS   = 25;
+static const int PIN_BMS_STATUS   = 28;
 
 // HV battery current sensor analog input; sampled into the fast data log.
-static const int HV_CURRENT_SENSE_PIN = 14;
+static const int PIN_HV_CURRENT_SENSE = 14;
 
 // MPU6050 IMU on the default Wire pins (18=SDA, 19=SCL). The sensor's INT pin
 // is wired to 33 and configured as data-ready, but samples are polled at the
 // fast-log rate so the interrupt is informational only.
-static const int IMU_INT_PIN = 33;
+static const int PIN_IMU_INT = 33;
 
 // EURO-XPD analog input pins from VCU_Pedal_Read_Test.
-static const int APPS_1_PIN = 38;         // Inverted channel
-static const int APPS_2_PIN = 41;         // Normal channel
-static const int BSE_1_PIN  = 17;
-static const int BSE_2_PIN  = 16;
+static const int PIN_APPS_1 = 38;         // Inverted channel
+static const int PIN_APPS_2 = 41;         // Normal channel
+static const int PIN_BSE_1  = 17;
+static const int PIN_BSE_2  = 16;
 
 // TSSI LED pins: low-side switches, HIGH = transistor on = LED on.
-static const int TSSI_LED_RED   = 3;
-static const int TSSI_LED_GREEN = 4;
+static const int PIN_TSSI_LED_RED   = 3;
+static const int PIN_TSSI_LED_GREEN = 4;
 
 #endif  // VCU_PINS_H

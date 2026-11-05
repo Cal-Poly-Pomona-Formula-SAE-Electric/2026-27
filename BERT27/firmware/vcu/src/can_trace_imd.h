@@ -15,11 +15,11 @@
 static constexpr uint8_t IMD_SNV_BYTE         = 0xFF;
 static constexpr uint16_t IMD_SNV_WORD        = 0xFFFF;
 
-void printImdRequestTranslation(const CAN_message_t &msg);
-void printImdResponseTranslation(const CAN_message_t &msg);
-void printImdInfoGeneralTranslation(const CAN_message_t &msg);
-void printImdInfoIsolationDetailTranslation(const CAN_message_t &msg);
-void printImdInfoVoltageTranslation(const CAN_message_t &msg);
-void printImdInfoItSystemTranslation(const CAN_message_t &msg);
+void tracePrintImdRequest(const CAN_message_t &frame);
+void tracePrintImdResponse(const CAN_message_t &frame);
+void tracePrintImdInfoGeneral(const CAN_message_t &frame);
+void tracePrintImdInfoIsolationDetail(const CAN_message_t &frame);
+void tracePrintImdInfoVoltage(const CAN_message_t &frame);
+void tracePrintImdInfoItSystem(const CAN_message_t &frame);
 
 #endif  // VCU_CAN_TRACE_IMD_H

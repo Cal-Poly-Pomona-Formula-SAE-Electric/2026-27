@@ -20,15 +20,15 @@ struct __attribute__((packed)) MeasuredImuRecord {
 };
 
 extern File sdMeasuredLogFile;
-extern bool sdCardStarted;
-extern bool sdLogActive;
+extern bool isSdCardStarted;
+extern bool isSdLogActive;
 extern uint32_t logSessionNumber;
 
-void setupDataLogging();
-void serviceDataLogging();
-void appendSdLog(File &file, bool measuredLog, const void *data, size_t len);
-void listLogFiles();
-void dumpLogFile(uint32_t session);
-void writeCellDataResponseLog(const CAN_message_t &msg);
+void logSetup();
+void logService();
+void logAppendSd(File &file, bool measuredLog, const void *data, size_t len);
+void logListFiles();
+void logDumpFile(uint32_t session);
+void logWriteCellDataResponse(const CAN_message_t &frame);
 
 #endif  // VCU_DATA_LOG_H

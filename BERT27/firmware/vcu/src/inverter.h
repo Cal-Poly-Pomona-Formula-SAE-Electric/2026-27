@@ -12,34 +12,34 @@
 #include <Arduino.h>
 #include <FlexCAN_T4.h>
 
-extern float inverterDcBusVoltage;
-extern float inverterDcBusCurrent;
-extern bool haveInverterVoltageInfo;
-extern bool haveInverterCurrentInfo;
-extern float glvVoltage;
-extern bool haveGlvVoltage;
-extern bool havePm100Traffic;
+extern float inverterDcBusVoltageV;
+extern float inverterDcBusCurrentA;
+extern bool hasInverterVoltageInfo;
+extern bool hasInverterCurrentInfo;
+extern float glvVoltageV;
+extern bool hasGlvVoltage;
+extern bool hasPm100Traffic;
 extern uint32_t firstPm100FrameMs;
 extern float powerKw;
 extern int16_t inverterTempTenthsC;
 extern int16_t pm100MotorTempTenthsC;
-extern bool haveInverterTemp;
-extern bool havePm100MotorTemp;
+extern bool hasInverterTemp;
+extern bool hasPm100MotorTemp;
 extern uint32_t pm100PostFaults;
 extern uint32_t pm100RunFaults;
-extern bool havePm100FaultStatus;
-extern bool pm100Fault;
+extern bool hasPm100FaultStatus;
+extern bool hasPm100Fault;
 extern int16_t motorRpm;
 
-void handlePm100Temperatures1Frame(const CAN_message_t &msg);
-void handlePm100Temperatures3Frame(const CAN_message_t &msg);
-void handlePm100RpmFrame(const CAN_message_t &msg);
-void handlePm100CurrentInfoFrame(const CAN_message_t &msg);
-void handlePm100VoltageInfoFrame(const CAN_message_t &msg);
-void handlePm100InternalVoltagesFrame(const CAN_message_t &msg);
-void handlePm100ParamResponseFrame(const CAN_message_t &msg);
-void servicePm100BroadcastEnable();
-void servicePm100FaultClear();
-void handlePm100FaultCodesFrame(const CAN_message_t &msg);
+void inverterHandleTemperatures1Frame(const CAN_message_t &frame);
+void inverterHandleTemperatures3Frame(const CAN_message_t &frame);
+void inverterHandleRpmFrame(const CAN_message_t &frame);
+void inverterHandleCurrentInfoFrame(const CAN_message_t &frame);
+void inverterHandleVoltageInfoFrame(const CAN_message_t &frame);
+void inverterHandleInternalVoltagesFrame(const CAN_message_t &frame);
+void inverterHandleParamResponseFrame(const CAN_message_t &frame);
+void inverterServiceBroadcastEnable();
+void inverterServiceFaultClear();
+void inverterHandleFaultCodesFrame(const CAN_message_t &frame);
 
 #endif  // VCU_INVERTER_H

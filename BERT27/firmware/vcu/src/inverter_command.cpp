@@ -19,13 +19,13 @@
 #include "pedals.h"
 #include "rtd.h"
 
-void pm100CommandTimerIsr();
-float calculateDisplayedCommandTorqueNm();
-void queuePm100TxLogFromIsr(const CAN_message_t &msg);
-bool dequeuePm100TxLog(CAN_message_t &msg);
-uint8_t pm100DirectionByteForMode(char mode);
+void inverterCmdTimerIsr();
+float inverterCmdCalculateDisplayedTorqueNm();
+void inverterCmdQueueTxLogFromIsr(const CAN_message_t &frame);
+bool inverterCmdDequeueTxLog(CAN_message_t &frame);
+uint8_t inverterCmdGetDirectionByte(char mode);
 
-static constexpr uint16_t TORQUE_SCALE       = 10;      // 0.1 Nm per LSB
+static constexpr uint16_t PM100_TORQUE_RAW_PER_NM       = 10;      // 0.1 Nm per LSB
 static constexpr uint32_t CMD_PERIOD_MS      = 10;      // 100 Hz
 static constexpr uint32_t PM100_CMD_PERIOD_US = CMD_PERIOD_MS * 1000u;
 
@@ -50,30 +50,30 @@ volatile uint8_t pm100TxLogTail = 0;
 volatile uint32_t pm100TxLogDropped = 0;
 
 // ---------------- PM100 CAN command output ----------------
-void setupPm100CommandTimer() {
-  updatePm100CommandState();
-  pm100CommandTimerIsr();
-  pm100CommandTimer.begin(pm100CommandTimerIsr, PM100_CMD_PERIOD_US);
+void inverterCmdSetupTimer() {
+  inverterCmdUpdateState();
+  inverterCmdTimerIsr();
+  pm100CommandTimer.begin(inverterCmdTimerIsr, PM100_CMD_PERIOD_US);
   Serial.println("[PM100] 100 Hz command timer started");
 }
 
-void pm100CommandTimerIsr() {
-  CAN_message_t tx = {};
-  tx.id = PM100_CMD_ID;
-  tx.len = 8;
-  tx.flags.extended = 0;
+void inverterCmdTimerIsr() {
+  CAN_message_t txFrame = {};
+  txFrame.id = PM100_CMD_ID;
+  txFrame.len = 8;
+  txFrame.flags.extended = 0;
 
   int16_t torqueRaw = pm100CommandTorqueRaw;
-  tx.buf[0] = (uint8_t)(torqueRaw & 0xFF);
-  tx.buf[1] = (uint8_t)((torqueRaw >> 8) & 0xFF);
-  tx.buf[4] = pm100CommandDirection;
-  tx.buf[5] = pm100CommandEnable;
+  txFrame.buf[0] = (uint8_t)(torqueRaw & 0xFF);
+  txFrame.buf[1] = (uint8_t)((torqueRaw >> 8) & 0xFF);
+  txFrame.buf[4] = pm100CommandDirection;
+  txFrame.buf[5] = pm100CommandEnable;
 
-  VehicleCan.write(tx);
-  queuePm100TxLogFromIsr(tx);
+  vehicleCan.write(txFrame);
+  inverterCmdQueueTxLogFromIsr(txFrame);
 }
 
-void updatePm100CommandState() {
+void inverterCmdUpdateState() {
   int16_t torqueRaw = 0;
   uint8_t direction = 0x00;
   uint8_t inverterEnable = 0x00;
@@ -81,16 +81,16 @@ void updatePm100CommandState() {
   // Calculate the diagnostic request before the TS/RTD safety gate. This lets
   // pedal, brake, and regen commissioning be observed with HV disabled while
   // the actual PM100 command below remains zero and disabled.
-  displayedCommandTorqueNm = calculateDisplayedCommandTorqueNm();
+  displayedCommandTorqueNm = inverterCmdCalculateDisplayedTorqueNm();
 
-  bool driveSelected = readyToDriveLatched && (driveMode == 'D');
+  bool isDriveSelected = isReadyToDriveLatched && (driveMode == 'D');
   // APPS implausibility and an active BSPC keep the inverter enabled but command
-  // zero torque: updatePedal already forces desiredTorqueNm to 0 for both.
-  bool torqueAllowed = driveSelected && !anyFaultActive() && !contactorsOpen();
+  // zero torque: pedalsUpdate already forces desiredTorqueNm to 0 for both.
+  bool isTorqueAllowed = isDriveSelected && !faultsIsAnyActive() && !bmsAreContactorsOpen();
 
-  if (torqueAllowed) {
-    torqueRaw = (int16_t)roundf(displayedCommandTorqueNm * (float)TORQUE_SCALE);
-    direction = pm100DirectionByteForMode(driveMode);
+  if (isTorqueAllowed) {
+    torqueRaw = (int16_t)roundf(displayedCommandTorqueNm * (float)PM100_TORQUE_RAW_PER_NM);
+    direction = inverterCmdGetDirectionByte(driveMode);
     inverterEnable = 0x01;
   }
 
@@ -100,58 +100,58 @@ void updatePm100CommandState() {
   pm100CommandEnable = inverterEnable;
   interrupts();
 
-  commandedTorqueNm = (float)torqueRaw / (float)TORQUE_SCALE;
+  commandedTorqueNm = (float)torqueRaw / (float)PM100_TORQUE_RAW_PER_NM;
 }
 
 // Builds the signed, quantized torque request independently of TS/RTD state.
-// Safety inputs still affect the request through updatePedal and
-// calculateRegenTorqueNm; updatePm100CommandState separately decides whether
+// Safety inputs still affect the request through pedalsUpdate and
+// regenCalculateTorqueNm; inverterCmdUpdateState separately decides whether
 // this value is permitted onto the CAN bus.
-float calculateDisplayedCommandTorqueNm() {
+float inverterCmdCalculateDisplayedTorqueNm() {
   float torqueNm = desiredTorqueNm;
-  regenTorqueNm = calculateRegenTorqueNm();
+  regenTorqueNm = regenCalculateTorqueNm();
   if (regenTorqueNm > 0.0f) {
     // Negative torque in the selected forward direction commands regeneration.
     torqueNm = -regenTorqueNm;
   }
 
-  if (powerDerateActive && torqueNm > 0.0f) {
-    float cap = powerDerateTorqueCapNm(motorRpm);
-    if (torqueNm > cap) torqueNm = cap;
+  if (isPowerDerateActive && torqueNm > 0.0f) {
+    float capNm = derateCalcTorqueCapNm(motorRpm);
+    if (torqueNm > capNm) torqueNm = capNm;
   }
 
-  return roundf(torqueNm * (float)TORQUE_SCALE) / (float)TORQUE_SCALE;
+  return roundf(torqueNm * (float)PM100_TORQUE_RAW_PER_NM) / (float)PM100_TORQUE_RAW_PER_NM;
 }
 
-void queuePm100TxLogFromIsr(const CAN_message_t &msg) {
+void inverterCmdQueueTxLogFromIsr(const CAN_message_t &frame) {
   uint8_t nextHead = (uint8_t)((pm100TxLogHead + 1u) % PM100_TX_LOG_QUEUE_SIZE);
   if (nextHead == pm100TxLogTail) {
     pm100TxLogDropped++;
     return;
   }
 
-  pm100TxLogQueue[pm100TxLogHead] = msg;
+  pm100TxLogQueue[pm100TxLogHead] = frame;
   pm100TxLogHead = nextHead;
 }
 
-bool dequeuePm100TxLog(CAN_message_t &msg) {
-  bool haveMessage = false;
+bool inverterCmdDequeueTxLog(CAN_message_t &frame) {
+  bool hasMessage = false;
 
   noInterrupts();
   if (pm100TxLogTail != pm100TxLogHead) {
-    msg = pm100TxLogQueue[pm100TxLogTail];
+    frame = pm100TxLogQueue[pm100TxLogTail];
     pm100TxLogTail = (uint8_t)((pm100TxLogTail + 1u) % PM100_TX_LOG_QUEUE_SIZE);
-    haveMessage = true;
+    hasMessage = true;
   }
   interrupts();
 
-  return haveMessage;
+  return hasMessage;
 }
 
-void servicePm100TxLogging() {
-  CAN_message_t tx;
-  while (dequeuePm100TxLog(tx)) {
-    logCanFrame("TX", tx);
+void inverterCmdServiceTxLogging() {
+  CAN_message_t txFrame;
+  while (inverterCmdDequeueTxLog(txFrame)) {
+    canLogFrame("TX", txFrame);
   }
 
   static uint32_t lastDroppedCount = 0;
@@ -168,7 +168,7 @@ void servicePm100TxLogging() {
   }
 }
 
-uint8_t pm100DirectionByteForMode(char mode) {
+uint8_t inverterCmdGetDirectionByte(char mode) {
   (void)mode;
   return 0x00;
 }

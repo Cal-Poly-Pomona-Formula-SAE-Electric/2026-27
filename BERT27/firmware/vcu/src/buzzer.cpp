@@ -7,14 +7,14 @@
  * Worked on by: BERT27 restructure
  * Rules:   FSAE 2027 V1 EV.10.7
  *
- * serviceBuzzer() runs every loop() and steps through the active pattern
+ * buzzerService() runs every loop() and steps through the active pattern
  * without blocking.
  */
 #include "buzzer.h"
 
 #include "pins.h"
 
-void stopBuzzer();
+void buzzerStop();
 
 static const ToneStep TS_READY_CHIME_PATTERN[] = {
   {1568, 200, 0},
@@ -23,40 +23,40 @@ static const ToneStep TS_READY_CHIME_PATTERN[] = {
 };
 
 const ToneStep *activeTonePattern = nullptr;
-uint8_t activeToneLength = 0;
+uint8_t activeToneStepCount = 0;
 uint8_t activeToneIndex = 0;
-bool activeToneInGap = false;
-bool activeToneRepeats = false;
+bool isActiveToneInGap = false;
+bool doesActiveToneRepeat = false;
 uint32_t activeToneDeadlineMs = 0;
 
 // ---------------- Buzzer ----------------
-void playTonePattern(const ToneStep *pattern, uint8_t length, bool repeats) {
+void buzzerPlayPattern(const ToneStep *pattern, uint8_t length, bool repeats) {
   if (pattern == nullptr || length == 0) {
     return;
   }
 
   activeTonePattern = pattern;
-  activeToneLength = length;
+  activeToneStepCount = length;
   activeToneIndex = 0;
-  activeToneInGap = false;
-  activeToneRepeats = repeats;
+  isActiveToneInGap = false;
+  doesActiveToneRepeat = repeats;
   activeToneDeadlineMs = millis() + activeTonePattern[0].onMs;
-  tone(BUZZER_PIN, activeTonePattern[0].frequencyHz);
+  tone(PIN_BUZZER, activeTonePattern[0].frequencyHz);
 }
 
-void serviceBuzzer() {
+void buzzerService() {
   // 3-tone RTD-ready chime disabled for testing.
-  // bool shouldChimeForRtd = readyForRtdButton();
+  // bool shouldChimeForRtd = rtdIsReadyForButton();
   //
   // if (activeTonePattern != RTD_PATTERN) {
   //   if (shouldChimeForRtd) {
   //     if (activeTonePattern != TS_READY_CHIME_PATTERN) {
-  //       playTonePattern(TS_READY_CHIME_PATTERN,
+  //       buzzerPlayPattern(TS_READY_CHIME_PATTERN,
   //                       sizeof(TS_READY_CHIME_PATTERN) / sizeof(TS_READY_CHIME_PATTERN[0]),
   //                       true);
   //     }
   //   } else if (activeTonePattern == TS_READY_CHIME_PATTERN) {
-  //     stopBuzzer();
+  //     buzzerStop();
   //     return;
   //   }
   // }
@@ -65,45 +65,45 @@ void serviceBuzzer() {
     return;
   }
 
-  uint32_t now = millis();
-  if ((int32_t)(now - activeToneDeadlineMs) < 0) {
+  uint32_t nowMs = millis();
+  if ((int32_t)(nowMs - activeToneDeadlineMs) < 0) {
     return;
   }
 
   const ToneStep &step = activeTonePattern[activeToneIndex];
 
-  if (!activeToneInGap && step.offMs > 0) {
-    noTone(BUZZER_PIN);
-    activeToneInGap = true;
-    activeToneDeadlineMs = now + step.offMs;
+  if (!isActiveToneInGap && step.offMs > 0) {
+    noTone(PIN_BUZZER);
+    isActiveToneInGap = true;
+    activeToneDeadlineMs = nowMs + step.offMs;
     return;
   }
 
   activeToneIndex++;
-  activeToneInGap = false;
+  isActiveToneInGap = false;
 
-  if (activeToneIndex >= activeToneLength) {
-    if (activeToneRepeats) {
+  if (activeToneIndex >= activeToneStepCount) {
+    if (doesActiveToneRepeat) {
       activeToneIndex = 0;
-      activeToneInGap = false;
-      tone(BUZZER_PIN, activeTonePattern[activeToneIndex].frequencyHz);
-      activeToneDeadlineMs = now + activeTonePattern[activeToneIndex].onMs;
+      isActiveToneInGap = false;
+      tone(PIN_BUZZER, activeTonePattern[activeToneIndex].frequencyHz);
+      activeToneDeadlineMs = nowMs + activeTonePattern[activeToneIndex].onMs;
     } else {
-      stopBuzzer();
+      buzzerStop();
     }
     return;
   }
 
-  tone(BUZZER_PIN, activeTonePattern[activeToneIndex].frequencyHz);
-  activeToneDeadlineMs = now + activeTonePattern[activeToneIndex].onMs;
+  tone(PIN_BUZZER, activeTonePattern[activeToneIndex].frequencyHz);
+  activeToneDeadlineMs = nowMs + activeTonePattern[activeToneIndex].onMs;
 }
 
-void stopBuzzer() {
-  noTone(BUZZER_PIN);
+void buzzerStop() {
+  noTone(PIN_BUZZER);
   activeTonePattern = nullptr;
-  activeToneLength = 0;
+  activeToneStepCount = 0;
   activeToneIndex = 0;
-  activeToneInGap = false;
-  activeToneRepeats = false;
+  isActiveToneInGap = false;
+  doesActiveToneRepeat = false;
   activeToneDeadlineMs = 0;
 }
