@@ -3,8 +3,8 @@
 - [x] vehicle_can
 - [x] vehicle_speed
 - [x] tssi (source still in progress)
-- [ ] rtd
-- [ ] regen
+- [x] rtd
+- [x] regen
 - [ ] power_derate
 - [ ] pedals
 - [ ] main
@@ -17,5 +17,10 @@
 - [ ] fans
 - [ ] energy_meter
 - [ ] data_log
+- [ ] dashboard
+- [ ] can_trace
+- [ ] can_trace_imd
+- [ ] buzzer
+- [ ] bms_link
 
 
