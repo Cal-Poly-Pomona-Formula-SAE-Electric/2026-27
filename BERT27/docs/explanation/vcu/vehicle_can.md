@@ -43,7 +43,7 @@ The header file first sets up guards. If the header is not defined, it goes on t
 
 ## vehicle_can.cpp
 This code manages the CAN communication between the VCU and the other electronic systems in the vehicle, including the inverter, BMS, IMD, and energy meter. This is all done via the CAN outputs on the Teensy 4.1, and is connected to an external CAN transceiver.</br></br>
-There are five main functions:
+There are six main functions:
 ### canSetup()
 ```cpp
 void canSetup() {
@@ -56,7 +56,7 @@ void canSetup() {
 }
 ```
 This function initializes the CAN3 controller, configuring the communication bitrate, maximum number of hardware mailboxes, and enables FIFO (first-in, first-out) to manage incoming CAN messages.
-### canSendFrame()
+### canSendFrames()
 ```cpp
 void canSendFrame(CAN_message_t &frame) {
   noInterrupts();
@@ -65,7 +65,7 @@ void canSendFrame(CAN_message_t &frame) {
   canLogFrame("TX", frame);
 }
 ```
-This function transmits CAN messages from the VCU to the Teensy. It takes a CAN frame as input and transmits it to the CAN controller. Interrupts are temporarily disabled during this and renabled once the CAN frame is written. It also logs the attempt for debugging purposes.
+This function transmits CAN messages from the Teensy to the CAN bus. It takes a CAN frame as input and transmits it to the CAN controller. Interrupts are temporarily disabled during this and renabled once the CAN frame is written. It also logs the attempt for debugging purposes.
 ### canReceiveFrame()
 ```cpp
 void canReceiveFrames() {
@@ -188,4 +188,4 @@ void canLogFrameToSerial(const char *direction, const CAN_message_t &frame) {
   Serial.println();
 }
 ```
-These functions are used to monitors CAN communication for debugging. ```canLogFrame()``` updates the CAN frame, and calls ```canLogFrametoSerial()``` to display the message. The serial ooutput includes the transmission direction (TX/RX), timestamp, ID, format, msg length, and msg data in hex format. 
+These functions are used to monitors CAN communication for debugging. ```canLogFrame()``` logs the CAN frame, and calls ```canLogFrametoSerial()``` and ```traceUpdateState()```. The first displays the message, and the second is keeps track of the fram data. The serial ooutput includes the transmission direction (TX/RX), timestamp, ID, format, msg length, and msg data in hex format. 
