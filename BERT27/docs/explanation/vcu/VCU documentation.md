@@ -5,7 +5,7 @@
 - [x] tssi (source still in progress)
 - [x] rtd
 - [x] regen
-- [ ] power_derate
+- [x] power_derate
 - [ ] pedals
 - [ ] main
 - [ ] inverter
