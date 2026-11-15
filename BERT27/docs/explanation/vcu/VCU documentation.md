@@ -6,7 +6,7 @@
 - [x] rtd
 - [x] regen
 - [x] power_derate
-- [ ] pedals
+- [x] pedals
 - [ ] main
 - [ ] inverter
 - [ ] inverter_command
