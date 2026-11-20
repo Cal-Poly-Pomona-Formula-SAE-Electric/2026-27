@@ -8,8 +8,8 @@
 - [x] power_derate
 - [x] pedals
 - [ ] main
-- [ ] inverter
-- [ ] inverter_command
+- [x] inverter
+- [x] inverter_command
 - [ ] imu
 - [ ] imd
 - [ ] faults
