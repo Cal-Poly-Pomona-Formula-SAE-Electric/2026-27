@@ -1,0 +1,4 @@
+# Third-party packages imported by tools/analysis (pinned to the versions the scripts were checked with).
+# tools/decoders and every other script use the standard library only.
+numpy==2.2.1
+matplotlib==3.11.1
